@@ -1,6 +1,8 @@
 #include <Wire.h>
 #include "Drive.h"
 #include <L3G.h>
+#include "Stdfun.h"
+#include "Turret.h"
 
 Drive DriveTrain(6, 5);
 L3G gyro;
