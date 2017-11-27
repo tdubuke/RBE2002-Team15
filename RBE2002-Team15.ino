@@ -1,6 +1,5 @@
 #include <Wire.h>
 #include <L3G.h>
-#include <TimerOne.h>
 #include "Drive.h"
 #include "Stdfun.h"
 #include "Turret.h"
