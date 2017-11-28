@@ -11,7 +11,7 @@ SharpIR sFrontSonic(GP2YA41SK0F, A0);     // SharpIR(char* model, int Pin)
 Turret RobotTurret(10);                   // Turret(int iFanPin)
 
 // interrupt pin for the start and estop button
-const int iInterruptPin = 22;
+const int iInterruptPin = 3;
 
 // number of calibration cycles done by the gyro on startup
 const int iGyroCalCycles = 100;
@@ -74,7 +74,7 @@ void setup() {
   RobotTurret.initTurret();
 
   pinMode(iInterruptPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(iInterruptPin), setDrive, CHANGE); 
+  attachInterrupt(digitalPinToInterrupt(iInterruptPin), setDrive, FALLING); 
 
   // initialization of the gyro
   if (!gyro.init())
@@ -125,17 +125,17 @@ void loop() {
     
       case RightWallFollow:
         // sensor fusion of gyro and front range finder
-        DriveTrain.DriveToAngleDistance(setAngle, dAngle, setDistance, iFrontRange);
-
+        //DriveTrain.DriveToAngleDistance(iSetAngle, dAngle, iSetDist, iFrontRange);
+        DriveTrain.DriveTo(5, iFrontRange);
         // count number of successes on this PID loop
-        if(abs(iFrontRange - setDist) < 2) iSuccessCounter++;
+        if(abs(iFrontRange - iSetDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
         // if the number of successes is sufficient, then continue onto next state
         if(iSuccessCounter == iNumValidSuccesses){
           iSuccessCounter = 0;
-          rState = CornerTurning;
-          setAngle += 90;
+          //rState = CornerTurning;
+          iSetAngle += 90;
         }
       break;
     
@@ -145,8 +145,8 @@ void loop() {
     
       case CornerTurning:
         // turn to angle desired
-        DriveTrain.TurnTo(setAngle, dAngle);
-        if(abs(setAngle - dAngle) < 5) iSuccessCounter++;
+        DriveTrain.TurnTo(iSetAngle, dAngle);
+        if(abs(iSetAngle - dAngle) < 5) iSuccessCounter++;
         else iSuccessCounter = 0;
         
         if(iSuccessCounter == iNumValidSuccesses){
@@ -213,6 +213,8 @@ void calcRange(){
 }
 
 void setDrive(){
-  rState = FindWall;
+  //rState = FindWall;
+  Serial.println("Terminate");
+  exit(0);
 }
 
