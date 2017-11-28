@@ -10,6 +10,12 @@ Drive::Drive(int iRDrive, int iLDrive){
   iLeftDrivePin = iLDrive;
 }
 
+void Drive::resetPID(){
+  iTurnSumError = 0;
+  iRWallSumError = 0;
+  iDistSumError = 0;
+}
+
 /**
  * Initialization for the turn PID values
  * @param iKP The P value for turning PID
@@ -61,8 +67,8 @@ void Drive::initDrive(){
  */
 void Drive::TurnTo(int iSetAngle, int iCurAngle){
   int iMotorOut = PIDTurn(iSetAngle, iCurAngle);
-  sRightDrive.write(iMotorOut);
-  sLeftDrive.write(iMotorOut);
+  sRightDrive.write(90 + iMotorOut);
+  sLeftDrive.write(90 + iMotorOut);
 }
 
 /**
@@ -75,6 +81,10 @@ void Drive::TurnTo(int iSetAngle, int iCurAngle){
 void Drive::DriveToAngleDistance(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist){
   int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
   int iMotorSpeed = PIDDistance(iSetDist, iCurDist);
+  
+  if(iMotorOffset > 20) iMotorOffset = 20;
+  else if(iMotorOffset < -20) iMotorOffset = -20;
+  
   sRightDrive.write(90 - iMotorSpeed + iMotorOffset);
   sLeftDrive.write(90 + iMotorSpeed + iMotorOffset);
 }
@@ -161,7 +171,7 @@ int Drive::PIDTurn(int iSetAngle, int iCurAngle){
   else if(motorOut < -90) motorOut = -90;
 
   // return the current motorOut Data
-  return (int)(motorOut + 90.0);
+  return (int)(motorOut);
 }
 
 /**

@@ -11,6 +11,8 @@ public:
   Drive(int iRDrive, int iLDrive);
   void initDrive();
 
+  void resetPID();
+
   void initTurnPID(double iKP, double iKI, double iKD);
   void initRWallFollowingPID(double iKP, double iKI, double iKD);
   void initDistPID(double iKP, double iKI, double iKD);

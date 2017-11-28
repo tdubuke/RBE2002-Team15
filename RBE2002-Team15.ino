@@ -11,10 +11,10 @@ SharpIR sFrontSonic(GP2YA41SK0F, A0);     // SharpIR(char* model, int Pin)
 Turret RobotTurret(10);                   // Turret(int iFanPin)
 
 // interrupt pin for the start and estop button
-const int iInterruptPin = 3;
+const int iInterruptPin = 18;
 
 // number of calibration cycles done by the gyro on startup
-const int iGyroCalCycles = 100;
+const int iGyroCalCycles = 50;
 
 // data to subrtract off of raw gyro values
 double dSubData;
@@ -125,8 +125,8 @@ void loop() {
     
       case RightWallFollow:
         // sensor fusion of gyro and front range finder
-        //DriveTrain.DriveToAngleDistance(iSetAngle, dAngle, iSetDist, iFrontRange);
-        DriveTrain.DriveTo(5, iFrontRange);
+        Serial.println("RightWallFollowing");
+        DriveTrain.DriveToAngleDistance(iSetAngle, dAngle, iSetDist, iFrontRange);
         // count number of successes on this PID loop
         if(abs(iFrontRange - iSetDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
@@ -134,8 +134,10 @@ void loop() {
         // if the number of successes is sufficient, then continue onto next state
         if(iSuccessCounter == iNumValidSuccesses){
           iSuccessCounter = 0;
-          //rState = CornerTurning;
+          rState = CornerTurning;
           iSetAngle += 90;
+
+          DriveTrain.resetPID();
         }
       break;
     
@@ -145,6 +147,7 @@ void loop() {
     
       case CornerTurning:
         // turn to angle desired
+        Serial.println("CornerTurning");
         DriveTrain.TurnTo(iSetAngle, dAngle);
         if(abs(iSetAngle - dAngle) < 5) iSuccessCounter++;
         else iSuccessCounter = 0;
@@ -152,6 +155,7 @@ void loop() {
         if(iSuccessCounter == iNumValidSuccesses){
           rState = RightWallFollow;
           iSuccessCounter = 0;
+          DriveTrain.resetPID();
         }
       break;
     
@@ -184,6 +188,8 @@ void loop() {
   // debug the angle /*REMOVE*/
   Serial.print(dAngle);
   Serial.print(" ");
+  Serial.print(iSetAngle);
+  Serial.print(" ");
   Serial.println(iFrontRange);
 }
 
@@ -214,7 +220,7 @@ void calcRange(){
 
 void setDrive(){
   //rState = FindWall;
-  Serial.println("Terminate");
+  //Serial.println("Terminate");
   exit(0);
 }
 
