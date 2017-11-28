@@ -126,12 +126,14 @@ void loop() {
       case RightWallFollow:
         // sensor fusion of gyro and front range finder
         DriveTrain.DriveToAngleDistance(setAngle, dAngle, setDistance, iFrontRange);
-        
+
+        // count number of successes on this PID loop
         if(abs(iFrontRange - setDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
-  
+
+        // if the number of successes is sufficient, then continue onto next state
         if(iSuccessCounter == iNumValidSuccesses){
-          successCounter = 0;
+          iSuccessCounter = 0;
           rState = CornerTurning;
           setAngle += 90;
         }
@@ -142,16 +144,14 @@ void loop() {
       break;
     
       case CornerTurning:
+        // turn to angle desired
         DriveTrain.TurnTo(setAngle, dAngle);
-        if(abs(setAngle - dAngle) < 5){
-          successCounter++;
-        }else{
-          successCounter = 0;
-        }
-  
-        if(successCounter == 30){
+        if(abs(setAngle - dAngle) < 5) iSuccessCounter++;
+        else iSuccessCounter = 0;
+        
+        if(iSuccessCounter == iNumValidSuccesses){
           rState = RightWallFollow;
-          successCounter = 0;
+          iSuccessCounter = 0;
         }
       break;
     
