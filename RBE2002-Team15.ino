@@ -14,7 +14,7 @@ Turret RobotTurret(10);                   // Turret(int iFanPin)
 const int iInterruptPin = 18;
 
 // number of calibration cycles done by the gyro on startup
-const int iGyroCalCycles = 50;
+const int iGyroCalCycles = 370;
 
 // data to subrtract off of raw gyro values
 double dSubData;
@@ -66,9 +66,9 @@ void setup() {
 
   // initialization of the drive train stuff
   DriveTrain.initDrive();
-  DriveTrain.initTurnPID(2, 0, 1);
+  DriveTrain.initTurnPID(2, .0001, 3);
   //DriveTrain.initRWallFollowingPID(1, 1, 1);
-  DriveTrain.initDistPID(4, .001, 5);
+  DriveTrain.initDistPID(5, .001, 5);
 
   // initialization of the robot turret
   RobotTurret.initTurret();
@@ -219,8 +219,12 @@ void calcRange(){
 }
 
 void setDrive(){
-  //rState = FindWall;
-  //Serial.println("Terminate");
-  exit(0);
+//  if(rState == IdleCalibrate){
+//    rState = FindWall;
+//    Serial.println("Going to Right Wall Following");
+//  }else{
+    Serial.println("E-stop");
+    exit(0);
+ // }
 }
 
