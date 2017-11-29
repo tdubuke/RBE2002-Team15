@@ -1,11 +1,10 @@
 // Stdfun.cpp
 // File to be used to hold functions not part of a class
 #include "Stdfun.h"
-#include <Encoder.h>
 
-void resetEncoderVal(Encoder eREncoder, Encoder eLEncoder){
-  eREncoder.write(0);
-  eLEncoder.write(0);
+void resetEncoderVal(Encoder *eREncoder, Encoder *eLEncoder){
+  eREncoder->write(0);
+  eLEncoder->write(0);
 }
 /*
 void addToGlobalXPos(Encoder eREncoder, Encoder eREncoder, float ffXPosition){
@@ -21,8 +20,8 @@ void addToGlobalXPos(Encoder eREncoder, Encoder eREncoder, float ffXPosition){
 }
 */
 
-float returnDistance(Encoder eEncoder){
-  long ticks = eEncoder.read();
+float returnDistance(Encoder *eEncoder){
+  long ticks = eEncoder->read();
 
   float distance = (ticks*2.75*PI) / 45;
 

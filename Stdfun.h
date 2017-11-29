@@ -4,6 +4,6 @@
 #include <Encoder.h>
 #include <Arduino.h>
 
-void resetEncoders(Encoder eREncoder, Encoder eLEncoder);
+void resetEncoders(Encoder *eREncoder, Encoder *eLEncoder);
 //void addToGlobalXPos(Encoder eREncoder, Encoder eREncoder, float ffXPosition);
-long returnEncoderValue(Encoder eEncoder);
+long returnEncoderValue(Encoder *eEncoder);
