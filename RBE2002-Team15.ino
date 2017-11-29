@@ -46,6 +46,12 @@ int iSetDist = 5;
 // flag if calibrated
 bool isCalibrated = false;
 
+// global x and y positions
+double dXPosition = 0;
+double dYPosition = 0;
+
+
+
 // state machine enumeration
 enum STATE{
   IdleCalibrate,
@@ -77,7 +83,7 @@ void setup() {
   RobotTurret.initTurret();
 
   pinMode(iInterruptPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(iInterruptPin), setDrive, FALLING); 
+  attachInterrupt(digitalPinToInterrupt(iInterruptPin), setDrive, FALLING);
 
   // initialization of the gyro
   if (!gyro.init())
@@ -99,7 +105,7 @@ void loop() {
   if((iCurTime - iLastTime) > 100){
     calcDegree();
     calcRange();
-    
+
     // set last time through the loop
     iLastTime = iCurTime;
   }
@@ -112,20 +118,20 @@ void loop() {
         if(dSubData == 0){
           // calibrate the gyro
           //dSubData = calibrateGyro();
-          
+
           // arm the fan
           /* FUNCTION TO ARM THE FAN */
-  
+
           // set flag that the robot has been calibrated
           isCalibrated = true;
         }
       break;
-  
+
       case FindWall:
         /*PLACE HOLDER, TO BE USED IF NECESSARY*/
         rState = RightWallFollow;
       break;
-    
+
       case RightWallFollow:
         // sensor fusion of gyro and front range finder
         //Serial.println("RightWallFollowing");
@@ -143,39 +149,39 @@ void loop() {
           DriveTrain.resetPID();
         }
       break;
-    
+
       case WallEdgeTurning:
-  
+
       break;
-    
+
       case CornerTurning:
         // turn to angle desired
         //Serial.println("CornerTurning");
         DriveTrain.TurnTo(iSetAngle, dAngle);
         if(abs(iSetAngle - dAngle) < 5) iSuccessCounter++;
         else iSuccessCounter = 0;
-        
+
         if(iSuccessCounter == iNumValidSuccesses){
           rState = RightWallFollow;
           iSuccessCounter = 0;
           DriveTrain.resetPID();
         }
       break;
-    
+
       case ChickenHead:
-  
+
       break;
-    
+
       case Triangulate:
-  
+
       break;
-    
+
       case FlameApproach:
-  
+
       break;
-    
+
       case Extinguish:
-  
+
       break;
     }
 
@@ -198,16 +204,16 @@ void loop() {
 
 double calibrateGyro(){
   long total = 0;
-  
+
   Serial.println("Calibrating Gyro, Please Hold");
-  
+
   for(int i = 0; i < iGyroCalCycles; i++){
     gyro.read();
     total += ((int)gyro.g.x);
     delay(100);
     Serial.println(total);
   }
-  
+
   Serial.println("Calibrated");
   return total/iGyroCalCycles;
 }
@@ -231,3 +237,12 @@ void setDrive(){
  // }
 }
 
+void calcDistance(){
+  double dRTraveled  = returnDistance(&rEncoder);
+  double dLTraveled  = returnDistance(&lEncoder);
+  double degrees = dAngle;
+  double dBotTraveled = (dRTraveled + dLTraveled) / 2;
+
+  dXPosition += dBotTraveled * cos(degrees);
+  dYPosition += dBotTraveled * sin(degrees);
+}
