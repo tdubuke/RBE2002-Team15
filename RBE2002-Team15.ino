@@ -220,7 +220,7 @@ double calibrateGyro(){
 
 void calcDegree(){
   gyro.read();
-  dAngle += ((gyro.g.x) - dSubData) * .0001 * 9;
+  dAngle += ((gyro.g.x) - dSubData) * .001;
 }
 
 void calcRange(){
