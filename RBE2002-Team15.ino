@@ -10,14 +10,14 @@ Drive DriveTrain(6, 5);                   // Drive(int iRDrive, int iLDrive)
 L3G gyro;                                 // L3G
 SharpIR sFrontSonic(GP2YA41SK0F, A0);     // SharpIR(char* model, int Pin)
 Turret RobotTurret(10);                   // Turret(int iFanPin)
-Encoder rEncoder(2, 3);
-Encoder lEncoder(50, 52);
+Encoder rEncoder(2, 50);
+Encoder lEncoder(3, 51);
 
 // interrupt pin for the start and estop button
 const int iInterruptPin = 18;
 
 // number of calibration cycles done by the gyro on startup
-const int iGyroCalCycles = 50;
+const int iGyroCalCycles = 370;
 
 // data to subrtract off of raw gyro values
 double dSubData;
@@ -41,7 +41,7 @@ int iNumValidSuccesses = 20;
 // set angle to give to the PID loops
 int iSetAngle = 0;
 // set distance to give to the PID loops
-int iSetDist = 5;
+int iSetDist = 7;
 
 // flag if calibrated
 bool isCalibrated = false;
@@ -49,7 +49,6 @@ bool isCalibrated = false;
 // global x and y positions
 double dXPosition = 0;
 double dYPosition = 0;
-
 
 
 // state machine enumeration
@@ -75,9 +74,9 @@ void setup() {
 
   // initialization of the drive train stuff
   DriveTrain.initDrive();
-  DriveTrain.initTurnPID(2, .0001, 3);
+  DriveTrain.initTurnPID(2, .0005, 5);
   //DriveTrain.initRWallFollowingPID(1, 1, 1);
-  DriveTrain.initDistPID(5, .001, 5);
+  DriveTrain.initDistPID(3, .001, 5);
 
   // initialization of the robot turret
   RobotTurret.initTurret();
@@ -134,8 +133,11 @@ void loop() {
 
       case RightWallFollow:
         // sensor fusion of gyro and front range finder
-        //Serial.println("RightWallFollowing");
         DriveTrain.DriveToAngleDistance(iSetAngle, dAngle, iSetDist, iFrontRange);
+
+        calcDistance();
+        resetEncoderVal(&rEncoder, &lEncoder);
+        
         // count number of successes on this PID loop
         if(abs(iFrontRange - iSetDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
@@ -195,11 +197,12 @@ void loop() {
   //}
 
   // debug the angle /*REMOVE*/
-  Serial.print(dAngle);
+//  Serial.print(dAngle);
+//  Serial.print(" ");
+//  Serial.print(iSetAngle);
+  Serial.print(dXPosition);
   Serial.print(" ");
-  Serial.print(iSetAngle);
-  Serial.print(" ");
-  Serial.println(returnDistance(&rEncoder));
+  Serial.println(dYPosition);
 }
 
 double calibrateGyro(){
@@ -210,7 +213,7 @@ double calibrateGyro(){
   for(int i = 0; i < iGyroCalCycles; i++){
     gyro.read();
     total += ((int)gyro.g.x);
-    delay(100);
+    delay(20);
     Serial.println(total);
   }
 
@@ -220,7 +223,7 @@ double calibrateGyro(){
 
 void calcDegree(){
   gyro.read();
-  dAngle += ((gyro.g.x) - dSubData) * .001;
+  dAngle += ((gyro.g.x) - dSubData) * .000955;
 }
 
 void calcRange(){
@@ -228,21 +231,14 @@ void calcRange(){
 }
 
 void setDrive(){
-//  if(rState == IdleCalibrate){
-//    rState = FindWall;
-//    Serial.println("Going to Right Wall Following");
-//  }else{
-    Serial.println("E-stop");
-    exit(0);
- // }
+  //exit(0);
 }
 
 void calcDistance(){
   double dRTraveled  = returnDistance(&rEncoder);
   double dLTraveled  = returnDistance(&lEncoder);
-  double degrees = dAngle;
   double dBotTraveled = (dRTraveled + dLTraveled) / 2;
 
-  dXPosition += dBotTraveled * cos(degrees);
-  dYPosition += dBotTraveled * sin(degrees);
+  dXPosition += dBotTraveled * cos(dAngle);
+  dYPosition += dBotTraveled * sin(dAngle);
 }

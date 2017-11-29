@@ -167,8 +167,8 @@ int Drive::PIDTurn(int iSetAngle, int iCurAngle){
   double motorOut = iTurnKP * iError + iTurnKI * iTurnSumError + iTurnKD + iDer;
 
   // adjust to the correct values
-  if(motorOut > 90) motorOut = 90;
-  else if(motorOut < -90) motorOut = -90;
+  if(motorOut > 50) motorOut = 50;
+  else if(motorOut < -50) motorOut = -50;
 
   // return the current motorOut Data
   return (int)(motorOut);
@@ -197,8 +197,8 @@ int Drive::PIDDistance(int iSetDist, int iCurDist){
   double motorOut = iDistKP * iError + iDistKI * iDistSumError + iDistKD + iDer;
 
   // adjust to the correct values
-  if(motorOut > 90) motorOut = 90;
-  else if(motorOut < -90) motorOut = -90;
+  if(motorOut > 50) motorOut = 50;
+  else if(motorOut < -50) motorOut = -50;
 
   // return the current motorOut Data
   return (int)(motorOut);
