@@ -4,17 +4,20 @@
 #include "Drive.h"
 #include "Stdfun.h"
 #include "Turret.h"
+#include <Encoder.h>
 
 Drive DriveTrain(6, 5);                   // Drive(int iRDrive, int iLDrive)
 L3G gyro;                                 // L3G
 SharpIR sFrontSonic(GP2YA41SK0F, A0);     // SharpIR(char* model, int Pin)
 Turret RobotTurret(10);                   // Turret(int iFanPin)
+Encoder rEncoder(2, 3);
+Encoder lEncoder(50, 52);
 
 // interrupt pin for the start and estop button
 const int iInterruptPin = 18;
 
 // number of calibration cycles done by the gyro on startup
-const int iGyroCalCycles = 370;
+const int iGyroCalCycles = 50;
 
 // data to subrtract off of raw gyro values
 double dSubData;
@@ -125,7 +128,7 @@ void loop() {
     
       case RightWallFollow:
         // sensor fusion of gyro and front range finder
-        Serial.println("RightWallFollowing");
+        //Serial.println("RightWallFollowing");
         DriveTrain.DriveToAngleDistance(iSetAngle, dAngle, iSetDist, iFrontRange);
         // count number of successes on this PID loop
         if(abs(iFrontRange - iSetDist) < 2) iSuccessCounter++;
@@ -147,7 +150,7 @@ void loop() {
     
       case CornerTurning:
         // turn to angle desired
-        Serial.println("CornerTurning");
+        //Serial.println("CornerTurning");
         DriveTrain.TurnTo(iSetAngle, dAngle);
         if(abs(iSetAngle - dAngle) < 5) iSuccessCounter++;
         else iSuccessCounter = 0;
@@ -190,7 +193,7 @@ void loop() {
   Serial.print(" ");
   Serial.print(iSetAngle);
   Serial.print(" ");
-  Serial.println(iFrontRange);
+  Serial.println(returnDistance(&rEncoder));
 }
 
 double calibrateGyro(){
