@@ -24,7 +24,7 @@ void addToGlobalXPos(Encoder eREncoder, Encoder eREncoder, float ffXPosition){
 float returnDistance(Encoder eEncoder){
   long ticks = eEncoder.read();
 
-  float distance = ticks*2.75*PI;
+  float distance = (ticks*2.75*PI) / 45;
 
   return distance;
 }
