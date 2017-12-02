@@ -1,4 +1,4 @@
-#include <Wire.h>
+ #include <Wire.h>
 #include <L3G.h>
 #include <SharpIR.h>
 #include "Drive.h"
@@ -16,6 +16,10 @@ Encoder lEncoder(3, 51);
 // interrupt pin for the start and estop button
 const int iInterruptPin = 18;
 
+// pins for the right range finder
+const int iREchoPin = 22;
+const int iRTrigPin = 23;
+
 // number of calibration cycles done by the gyro on startup
 const int iGyroCalCycles = 370;
 
@@ -25,6 +29,8 @@ double dSubData;
 double dAngle = 0;
 // current range of the front range finder
 int iFrontRange = 0;
+// current range of the right range finder
+int iRightRange = 0;
 
 // timer counter for the state machine
 long iLastSwitchTime = 0;
@@ -42,6 +48,12 @@ int iNumValidSuccesses = 20;
 int iSetAngle = 0;
 // set distance to give to the PID loops
 int iSetDist = 7;
+// set distance to give to PID loops from right wall
+int iSetRDist = 7;
+// last set distance on PID from wall
+int iLastRDist = 1000;
+
+int iThisCurDist = 0;
 
 // flag if calibrated
 bool isCalibrated = false;
@@ -57,15 +69,22 @@ enum STATE{
   FindWall,
   RightWallFollow,
   WallEdgeTurning,
+  DriveToEncoder,
   CornerTurning,
   ChickenHead,
   Triangulate,
   FlameApproach,
-  Extinguish
+  Extinguish,
+  WallCorner0,
+  WallCorner1,
+  WallCorner2,
+  WallCorner3,
+  WallCorner4,
 };
 
 // beginning state of the robot
-int rState = FindWall;
+int rState = IdleCalibrate;
+int rLastState = FindWall;
 
 // setup for the robot
 void setup() {
@@ -74,9 +93,9 @@ void setup() {
 
   // initialization of the drive train stuff
   DriveTrain.initDrive();
-  DriveTrain.initTurnPID(2, .0005, 5);
-  //DriveTrain.initRWallFollowingPID(1, 1, 1);
-  DriveTrain.initDistPID(3, .001, 5);
+  DriveTrain.initTurnPID(3, .0001, 5);
+  DriveTrain.initRWallPID(2, .0005, 5);
+  DriveTrain.initDistPID(3, .0001, 5);
 
   // initialization of the robot turret
   RobotTurret.initTurret();
@@ -91,8 +110,9 @@ void setup() {
     while (1);
   }
 
-  // calibrate the subData /* TO BE MOVED TO CALIBRATION STATE OF STATE MACHINE */
-  dSubData = calibrateGyro();
+  pinMode(iREchoPin, INPUT);
+  pinMode(iRTrigPin, OUTPUT);
+  
   gyro.enableDefault();
 }
 
@@ -102,11 +122,11 @@ void loop() {
 
   // if the time is 100 milliseconds approx then recalcuate the sensor data
   if((iCurTime - iLastTime) > 100){
-    calcDegree();
-    calcRange();
-
+    calcDegree(); 
     // set last time through the loop
     iLastTime = iCurTime;
+    calcRange();
+
   }
 
   // go through the state machine every 10 ms, not any faster
@@ -116,24 +136,25 @@ void loop() {
         // check if calibration has been done, if so then dont do it again
         if(dSubData == 0){
           // calibrate the gyro
-          //dSubData = calibrateGyro();
+          dSubData = calibrateGyro();
 
           // arm the fan
           /* FUNCTION TO ARM THE FAN */
 
           // set flag that the robot has been calibrated
           isCalibrated = true;
+
+          rState = FindWall;
         }
+
+        calcDistance();
+        resetEncoderVal(&rEncoder, &lEncoder);
       break;
 
       case FindWall:
-        /*PLACE HOLDER, TO BE USED IF NECESSARY*/
-        rState = RightWallFollow;
-      break;
-
-      case RightWallFollow:
-        // sensor fusion of gyro and front range finder
-        DriveTrain.DriveToAngleDistance(iSetAngle, dAngle, iSetDist, iFrontRange);
+        Serial.println("FindWall");
+        // sensor fusion of gyro and front range finder and right range finder
+        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iSetDist, iFrontRange, 0, 0);
 
         calcDistance();
         resetEncoderVal(&rEncoder, &lEncoder);
@@ -146,25 +167,60 @@ void loop() {
         if(iSuccessCounter == iNumValidSuccesses){
           iSuccessCounter = 0;
           rState = CornerTurning;
+          rLastState = FindWall;
           iSetAngle += 90;
 
           DriveTrain.resetPID();
         }
       break;
 
-      case WallEdgeTurning:
+      case RightWallFollow:
+        Serial.println("RightWallFollow");
+        // sensor fusion of gyro and front range finder and right range finder
+        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iSetDist, iFrontRange, iSetRDist, iRightRange);
 
+        calcDistance();
+        resetEncoderVal(&rEncoder, &lEncoder);
+        
+        // count number of successes on this PID loop
+        if(abs(iFrontRange - iSetDist) < 2) iSuccessCounter++;
+        else iSuccessCounter = 0;
+
+        // check to see if we came to wall edge
+        if((iRightRange - iLastRDist) > 20){
+          rState = WallCorner0;
+          rLastState = RightWallFollow;
+          iSetDist = 3;
+        }else iLastRDist = iRightRange;
+
+        // if the number of successes is sufficient, then continue onto next state
+        if(iSuccessCounter == iNumValidSuccesses){
+          iSuccessCounter = 0;
+          rState = CornerTurning;
+          rLastState = RightWallFollow;
+          iSetAngle += 90;
+
+          DriveTrain.resetPID();
+        }
       break;
 
       case CornerTurning:
+        Serial.println("CornerTurning");
         // turn to angle desired
-        //Serial.println("CornerTurning");
         DriveTrain.TurnTo(iSetAngle, dAngle);
+        
         if(abs(iSetAngle - dAngle) < 5) iSuccessCounter++;
         else iSuccessCounter = 0;
 
-        if(iSuccessCounter == iNumValidSuccesses){
+        if(iSuccessCounter == iNumValidSuccesses && rLastState == WallEdgeTurning){
+          rState = WallEdgeTurning;
+          rLastState = CornerTurning;
+          iSuccessCounter = 0;
+          iSetDist = 8;
+          DriveTrain.resetPID();
+        }else if(iSuccessCounter == iNumValidSuccesses && (rLastState == RightWallFollow || rLastState == FindWall)){
           rState = RightWallFollow;
+          rLastState = CornerTurning;
           iSuccessCounter = 0;
           DriveTrain.resetPID();
         }
@@ -185,24 +241,115 @@ void loop() {
       case Extinguish:
 
       break;
+
+      case WallCorner0:
+        Serial.println("CornerTurningForCornerWall0");
+        iThisCurDist = returnDistance(&rEncoder);
+        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iThisCurDist, iSetDist, 0, 0);
+         
+        if(abs(iThisCurDist - iSetDist) < 2) iSuccessCounter++;
+        else iSuccessCounter = 0;
+
+        // if the number of successes is sufficient, then continue onto next state
+        if(iSuccessCounter == iNumValidSuccesses){
+          iSuccessCounter = 0;
+          rState = WallCorner1;
+          rLastState = WallCorner0;
+          iSetAngle -= 90;
+
+          DriveTrain.resetPID();
+        }
+      break;
+
+      case WallCorner1:
+        Serial.println("CornerTurningForCornerWall1");
+        // turn to angle desired
+        DriveTrain.TurnTo(iSetAngle, dAngle);
+        
+        if(abs(iSetAngle - dAngle) < 5) iSuccessCounter++;
+        else iSuccessCounter = 0;
+
+        if(iSuccessCounter == iNumValidSuccesses){
+          rState = WallCorner2;
+          rLastState = WallCorner1;
+          iSuccessCounter = 0;
+          iSetDist = 6;
+          DriveTrain.resetPID();
+        }
+      break;
+
+      case WallCorner2:
+        Serial.println("CornerTurningForCornerWall2");
+        iThisCurDist = returnDistance(&rEncoder);
+        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iThisCurDist, iSetDist, 0, 0);
+         
+        if(abs(iThisCurDist - iSetDist) < 2) iSuccessCounter++;
+        else iSuccessCounter = 0;
+
+        // if the number of successes is sufficient, then continue onto next state
+        if(iSuccessCounter == iNumValidSuccesses){
+          iSuccessCounter = 0;
+          rState = WallCorner3;
+          rLastState = WallCorner2;
+          iSetAngle -= 90;
+
+          DriveTrain.resetPID();
+        }
+         
+      break;
+
+      case WallCorner3:
+        Serial.println("CornerTurningForCornerWall3");
+        // turn to angle desired
+        DriveTrain.TurnTo(iSetAngle, dAngle);
+        
+        if(abs(iSetAngle - dAngle) < 5) iSuccessCounter++;
+        else iSuccessCounter = 0;
+
+        if(iSuccessCounter == iNumValidSuccesses){
+          rState = WallCorner4;
+          rLastState = WallCorner3;
+          iSuccessCounter = 0;
+          iSetDist = 8;
+          DriveTrain.resetPID();
+        }
+      break;
+
+      case WallCorner4:
+        Serial.println("CornerTurningForCornerWall4");
+        iThisCurDist = returnDistance(&rEncoder);
+        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iThisCurDist, iSetDist, 0, 0);
+         
+        if(abs(iThisCurDist - iSetDist) < 2) iSuccessCounter++;
+        else iSuccessCounter = 0;
+
+        // if the number of successes is sufficient, then continue onto next state
+        if(iSuccessCounter == iNumValidSuccesses){
+          iSuccessCounter = 0;
+          rState = RightWallFollow;
+          rLastState = WallCorner4;
+          iSetDist = 7;
+
+          DriveTrain.resetPID();
+        }
+      break;
+
+      default:
+        exit(0);
+      break;
     }
 
     iLastSwitchTime = iCurTime;
   }
 
-  // test new functions here
-  //if((iCurTime - iLastTime) > 10){
-  //  DriveTrain.TurnTo(setAngle, dAngle);
-  //  DriveTrain.DriveTo(setDist, iFrontRange);
-  //}
-
-  // debug the angle /*REMOVE*/
-//  Serial.print(dAngle);
-//  Serial.print(" ");
-//  Serial.print(iSetAngle);
-  Serial.print(dXPosition);
-  Serial.print(" ");
-  Serial.println(dYPosition);
+//  Serial.print(" X: ");
+//  Serial.print(dXPosition);
+//  Serial.print(" Y: ");
+//  Serial.print(dYPosition);
+//  Serial.print(" FrontRange: ");
+//  Serial.print(iFrontRange);
+  Serial.print(" dAngle: ");
+  Serial.println(dAngle);
 }
 
 double calibrateGyro(){
@@ -228,6 +375,15 @@ void calcDegree(){
 
 void calcRange(){
   iFrontRange = sFrontSonic.getDistance();
+
+  digitalWrite(iRTrigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(iRTrigPin, HIGH);
+  delayMicroseconds(5);
+  digitalWrite(iRTrigPin, LOW);
+
+  int duration = pulseIn(iREchoPin, HIGH);
+  iRightRange = (duration/29/2);
 }
 
 void setDrive(){
@@ -236,9 +392,13 @@ void setDrive(){
 
 void calcDistance(){
   double dRTraveled  = returnDistance(&rEncoder);
-  double dLTraveled  = returnDistance(&lEncoder);
-  double dBotTraveled = (dRTraveled + dLTraveled) / 2;
+  //double dLTraveled  = returnDistance(&lEncoder);
+  double dBotTraveled = dRTraveled; //(dRTraveled + dLTraveled) / 2;
+  double dAngleRad = dAngle * 0.0174533;
 
-  dXPosition += dBotTraveled * cos(dAngle);
-  dYPosition += dBotTraveled * sin(dAngle);
+//  Serial.print(" dBot: ");
+//  Serial.print(dBotTraveled);
+
+  dXPosition += dBotTraveled * cos(dAngleRad);
+  dYPosition += dBotTraveled * sin(dAngleRad);
 }

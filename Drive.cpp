@@ -14,6 +14,8 @@ void Drive::resetPID(){
   iTurnSumError = 0;
   iRWallSumError = 0;
   iDistSumError = 0;
+  sRightDrive.write(90);
+  sLeftDrive.write(90);
 }
 
 /**
@@ -34,7 +36,7 @@ void Drive::initTurnPID(double iKP, double iKI, double iKD){
  * @param iKI The I value for Right Wall Following PID
  * @param iKD The D value for Right Wall Following PID
  */
-void Drive::initRWallFollowingPID(double iKP, double iKI, double iKD){
+void Drive::initRWallPID(double iKP, double iKI, double iKD){
   iRWallKP = iKP;
   iRWallKI = iKI;
   iRWallKD = iKD;
@@ -78,15 +80,19 @@ void Drive::TurnTo(int iSetAngle, int iCurAngle){
  * @param iSetDist The distance from the wall that is desired
  * @param iCurDist The distance from the wall that the robot is currently
  */
-void Drive::DriveToAngleDistance(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist){
+void Drive::DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist){
   int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
   int iMotorSpeed = PIDDistance(iSetDist, iCurDist);
+  int iMotorWallOffset = PIDRightWall(iSetRightDist, iCurRightDist);
   
   if(iMotorOffset > 20) iMotorOffset = 20;
   else if(iMotorOffset < -20) iMotorOffset = -20;
+
+  if(iMotorWallOffset > 20) iMotorWallOffset = 20;
+  else if(iMotorOffset < -20) iMotorWallOffset = -20;
   
-  sRightDrive.write(90 - iMotorSpeed + iMotorOffset);
-  sLeftDrive.write(90 + iMotorSpeed + iMotorOffset);
+  sRightDrive.write(90 - iMotorSpeed + iMotorOffset + iMotorWallOffset);
+  sLeftDrive.write(90 + iMotorSpeed + iMotorOffset + iMotorWallOffset);
 }
 
 /**
@@ -138,7 +144,7 @@ int Drive::PIDRightWall(int iSetDist, int iCurDist){
   //save the last error
   iRWallLastError = iError;
 
-  double motorOut = iRWallKP * iError + iRWallKI * iTurnSumError + iRWallKD + dDer;
+  double motorOut = iRWallKP * iError + iRWallKI * iRWallSumError + iRWallKD + dDer;
 
   // return the current motorOut Data
   return (int)(motorOut);

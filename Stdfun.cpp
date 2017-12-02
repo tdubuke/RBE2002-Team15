@@ -23,7 +23,7 @@ void addToGlobalXPos(Encoder eREncoder, Encoder eREncoder, float ffXPosition){
 double returnDistance(Encoder *eEncoder){
   long ticks = eEncoder->read();
 
-  double distance = (ticks*2.75*PI) / 2250;
+  double distance = (ticks*2.75*PI) / 12600;
 
   return distance;
 }

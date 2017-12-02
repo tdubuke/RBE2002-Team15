@@ -14,10 +14,10 @@ public:
   void resetPID();
 
   void initTurnPID(double iKP, double iKI, double iKD);
-  void initRWallFollowingPID(double iKP, double iKI, double iKD);
+  void initRWallPID(double iKP, double iKI, double iKD);
   void initDistPID(double iKP, double iKI, double iKD);
 
-  void DriveToAngleDistance(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist);
+  void DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist);
   
   void TurnTo(int iSetAngle, int iCurAngle);
   int PIDTurn(int iSetAngle, int iCurAngle);
