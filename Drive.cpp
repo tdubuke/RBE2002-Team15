@@ -69,6 +69,10 @@ void Drive::initDrive(){
  */
 void Drive::TurnTo(int iSetAngle, int iCurAngle){
   int iMotorOut = PIDTurn(iSetAngle, iCurAngle);
+
+  if(iMotorOut > 30) iMotorOut = 30;
+  else if(iMotorOut < -30) iMotorOut = -30;
+  
   sRightDrive.write(90 + iMotorOut);
   sLeftDrive.write(90 + iMotorOut);
 }
@@ -84,12 +88,15 @@ void Drive::DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSet
   int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
   int iMotorSpeed = PIDDistance(iSetDist, iCurDist);
   int iMotorWallOffset = PIDRightWall(iSetRightDist, iCurRightDist);
-  
-  if(iMotorOffset > 20) iMotorOffset = 20;
-  else if(iMotorOffset < -20) iMotorOffset = -20;
 
-  if(iMotorWallOffset > 20) iMotorWallOffset = 20;
-  else if(iMotorOffset < -20) iMotorWallOffset = -20;
+  if(iMotorSpeed > 30) iMotorSpeed = 30;
+  else if(iMotorSpeed < -30) iMotorSpeed = -30;
+  
+  if(iMotorOffset > 30) iMotorOffset = 30;
+  else if(iMotorOffset < -30) iMotorOffset = -30;
+
+  if(iMotorWallOffset > 30) iMotorWallOffset = 30;
+  else if(iMotorWallOffset < -30) iMotorWallOffset = -30;
   
   sRightDrive.write(90 - iMotorSpeed + iMotorOffset + iMotorWallOffset);
   sLeftDrive.write(90 + iMotorSpeed + iMotorOffset + iMotorWallOffset);
@@ -139,7 +146,7 @@ int Drive::PIDRightWall(int iSetDist, int iCurDist){
   double dDer = (iError - iRWallLastError)/10;
 
   // total up the sum of the error
-  iRWallSumError += (iError * 10);
+  if(iRWallSumError < 100000) iRWallSumError += (iError * 10);
 
   //save the last error
   iRWallLastError = iError;
@@ -164,7 +171,7 @@ int Drive::PIDTurn(int iSetAngle, int iCurAngle){
   double iDer = (iError - iTurnLastError)/10;
 
   // total up the sum of the error
-  iTurnSumError += (iError * 10);
+  if(iTurnSumError < 1000 || iError < 0) iTurnSumError += (iError * 10);
 
   // save the last error
   iTurnLastError = iError;
@@ -194,7 +201,7 @@ int Drive::PIDDistance(int iSetDist, int iCurDist){
   double iDer = (iError - iDistLastError)/10;
 
   // total up the sum of the error
-  iDistSumError += (iError * 10);
+  if(iDistSumError < 100) iDistSumError += (iError * 10);
 
   // save the last error
   iDistLastError = iError;
