@@ -155,7 +155,7 @@ void loop() {
 
       case FindWall:
         // sensor fusion of gyro and front range finder and right range finder
-        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iSetDist, iFrontRange, 0, 0);
+        //DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iSetDist, iFrontRange, 0, 0);
 
         calcDistance();
         resetEncoderVal(&rEncoder, &lEncoder);
@@ -257,6 +257,9 @@ void loop() {
           rLastState = WallCorner0;
           iSetAngle = dAngle - 90;
 
+          calcDistance();
+          resetEncoderVal(&rEncoder, &lEncoder);
+          
           DriveTrain.resetPID();
         }
       break;
@@ -297,6 +300,8 @@ void loop() {
           rLastState = WallCorner2;
           iSuccessCounter = 0;
           DriveTrain.resetPID();
+          
+          calcDistance();
           resetEncoderVal(&rEncoder, &lEncoder);
         }
          
@@ -315,6 +320,7 @@ void loop() {
           iSuccessCounter = 0;
           iSetDist = 5;
           DriveTrain.resetPID();
+          
           resetEncoderVal(&rEncoder, &lEncoder);
         }
       break;
