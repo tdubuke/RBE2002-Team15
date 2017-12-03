@@ -13,6 +13,19 @@ Turret RobotTurret(10);                   // Turret(int iFanPin)
 Encoder rEncoder(2, 50);
 Encoder lEncoder(3, 51);
 
+// for light sensor
+/*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
+int IRsensorAddress = 0xB0;
+int slaveAddress;
+
+byte data_buf[16];
+int i;
+ 
+int Ix[4];
+int Iy[4];
+int s;
+/*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
+
 // interrupt pin for the start and estop button
 const int iInterruptPin = 18;
 
@@ -103,6 +116,9 @@ void setup() {
   // initialization of the robot turret
   RobotTurret.initTurret();
 
+  initLightSensor();
+  Serial.println("light init success");
+
   pinMode(iInterruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(iInterruptPin), setDrive, FALLING);
 
@@ -129,6 +145,7 @@ void loop() {
     // set last time through the loop
     iLastTime = iCurTime;
     calcRange();
+    updateLightValues();
   }
 
   // go through the state machine every 10 ms, not any faster
@@ -146,16 +163,16 @@ void loop() {
           // set flag that the robot has been calibrated
           isCalibrated = true;
 
+          Serial.println("Ready to go Captain");
+        }
+        if(digitalRead(iInterruptPin) == 0){
           rState = FindWall;
         }
-
-        calcDistance();
-        resetEncoderVal(&rEncoder, &lEncoder);
       break;
 
       case FindWall:
         // sensor fusion of gyro and front range finder and right range finder
-        //DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iSetDist, iFrontRange, 0, 0);
+        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iSetDist, iFrontRange, 0, 0);
 
         calcDistance();
         resetEncoderVal(&rEncoder, &lEncoder);
@@ -190,7 +207,7 @@ void loop() {
         if(iRightRange > 20){
           rState = WallCorner0;
           rLastState = RightWallFollow;
-          iSetDist = 2;
+          iSetDist = 3;
         }else iLastRDist = iRightRange;
 
         // if the number of successes is sufficient, then continue onto next state
@@ -275,7 +292,7 @@ void loop() {
           rState = WallCorner2;
           rLastState = WallCorner1;
           iSuccessCounter = 0;
-          iSetDist = 5;
+          iSetDist = 7;
           DriveTrain.resetPID();
           
           resetEncoderVal(&rEncoder, &lEncoder);
@@ -331,13 +348,12 @@ void loop() {
     }
 
     iLastSwitchTime = iCurTime;
-    //Serial.println(iRightRange);
   }
 
   Serial.print(" X: ");
-  Serial.print(dXPosition);
+  Serial.print(Ix[0]);
   Serial.print(" Y: ");
-  Serial.println(dYPosition);
+  Serial.println(Iy[0]);
 //  Serial.print(" FrontRange: ");
 //  Serial.print(iFrontRange);
 //  Serial.print(" dAngle: ");
@@ -380,6 +396,65 @@ void calcRange(){
 
   int duration = pulseIn(iREchoPin, HIGH);
   iRightRange = (duration/74/2);
+}
+
+void updateLightValues(){
+  //IR sensor read
+  Wire.beginTransmission(slaveAddress);
+  Wire.write(0x36);
+  Wire.endTransmission();
+
+  Wire.requestFrom(slaveAddress, 16);        // Request the 2 byte heading (MSB comes first)
+  for (i=0;i<16;i++) { data_buf[i]=0; }
+  i=0;
+  while(Wire.available() && i < 16) {
+      data_buf[i] = Wire.read();
+      i++;
+  }
+
+  Ix[0] = data_buf[1];
+  Iy[0] = data_buf[2];
+  s   = data_buf[3];
+  Ix[0] += (s & 0x30) <<4;
+  Iy[0] += (s & 0xC0) <<2;
+
+  Ix[1] = data_buf[4];
+  Iy[1] = data_buf[5];
+  s   = data_buf[6];
+  Ix[1] += (s & 0x30) <<4;
+  Iy[1] += (s & 0xC0) <<2;
+
+  Ix[2] = data_buf[7];
+  Iy[2] = data_buf[8];
+  s   = data_buf[9];
+  Ix[2] += (s & 0x30) <<4;
+  Iy[2] += (s & 0xC0) <<2;
+
+  Ix[3] = data_buf[10];
+  Iy[3] = data_buf[11];
+  s   = data_buf[12];
+  Ix[3] += (s & 0x30) <<4;
+  Iy[3] += (s & 0xC0) <<2;
+}
+
+void initLightSensor(){
+  slaveAddress = IRsensorAddress >> 1;   // This results in 0x21 as the address to pass to TWI
+  // IR sensor initialize
+  Write_2bytes(0x30,0x01); delay(10);
+  Write_2bytes(0x30,0x08); delay(10);
+  Write_2bytes(0x06,0x90); delay(10);
+  Write_2bytes(0x08,0xC0); delay(10);
+  Write_2bytes(0x1A,0x40); delay(10);
+  Write_2bytes(0x33,0x33); delay(10);
+  delay(100);
+}
+
+void Write_2bytes(byte d1, byte d2)
+{
+  Wire.beginTransmission(slaveAddress);
+  Wire.write(d1); Wire.write(d2);
+  Wire.endTransmission();
+  Serial.println("light init success");
 }
 
 void setDrive(){
