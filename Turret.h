@@ -7,16 +7,40 @@
 #ifndef TURRET_H
 #define TURRET_H
 
+#define LEFT true //CCW direction is LOW
+#define RIGHT false //CW direction is HIGH
+
+#define STEP_ANGLE 1.8
+
 class Turret{
 public:
-  Turret(int iFanPin);
-  void initTurret();
+  //initialize the turret with
+  // - Fan Pin
+  // - Pan Step Pin
+  // - Pan Direction Pin
+  // - Tilt Step Pin //wip
+  // - Tilt Direction Pin //wip
   
+  Turret(int iFanPin, int iPanStep, int iPanDir);
+  void initTurret();
   void ArmFan();
+
+  void doSweep();
+  void alignPan(int flameRead);
+  
+  int getAngle();
+  
 private:
   Servo sESC;
 
   int iFanMotor;
+  int iPanStep;
+  int iPanDir;
+
+  boolean dir; // false is CCW, true is CW
+  //will compare this to LEFT or RIGHT
+
+  int iAngle;
 };
 
 #endif
