@@ -5,15 +5,42 @@
 #include "Stdfun.h"
 #include "Turret.h"
 #include <Encoder.h>
+#include <LiquidCrystal.h>
 
 Drive DriveTrain(6, 5);                   // Drive(int iRDrive, int iLDrive)
 L3G gyro;                                 // L3G
-SharpIR sFrontSonic(GP2Y0A21YK0F, A0);     // SharpIR(char* model, int Pin)GP2Y0A21YK0F
-Turret RobotTurret(10);                   // Turret(int iFanPin)
-Encoder rEncoder(2, 50);
-Encoder lEncoder(3, 51);
+SharpIR sFrontSonic(GP2Y0A21YK0F, A0);    // SharpIR(char* model, int Pin)GP2Y0A21YK0F
+Turret RobotTurret(10, 11, 12);           // Turret(int iFanPin)
+Encoder rEncoder(2, 50);                  // Robot wheel encoder for odometry
+Encoder lEncoder(3, 51);                  // Robot wheel encoder for odometry
+LiquidCrystal LCD(40,41,42,43,44,45);     // LCD display initialization
 
-// for light sensor
+struct SensorData{
+  int iLightSensorX;
+  int iLightSensorY;
+  int iFrontRange;
+  int iRightRange;
+  int iLastRightRange;
+};
+
+struct SetData{
+  int iSetAngle;
+  int iSetFrontDist;
+  int iSetRightDist;
+};
+
+struct GlobalPos{
+  double dAngle;
+  double dAngleOld;
+  double dXPosition;
+  double dYPosition;
+};
+
+SensorData s_SensorData;
+GlobalPos s_GlobalPos;
+SetData s_SetData;
+
+// for IR Sensor
 /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
 int IRsensorAddress = 0xB0;
 int slaveAddress;
@@ -36,18 +63,6 @@ const int iRTrigPin = 23;
 // number of calibration cycles done by the gyro on startup
 const int iGyroCalCycles = 1000;
 
-// data to subrtract off of raw gyro values
-double dSubData;
-// current angle of the robot
-double dAngle = 0;
-// old angle
-double dAngleOld = 0;
-
-// current range of the front range finder
-int iFrontRange = 0;
-// current range of the right range finder
-int iRightRange = 0;
-
 // timer counter for the state machine
 long iLastSwitchTime = 0;
 // timer counter for the last sensor data
@@ -60,24 +75,14 @@ int iSuccessCounter = 0;
 // number of successes needed to move to next stage
 int iNumValidSuccesses = 20;
 
-// set angle to give to the PID loops
-int iSetAngle = 0;
-// set distance to give to the PID loops
-int iSetDist = 5;
-// set distance to give to PID loops from right wall
-int iSetRDist = 3;
-// last set distance on PID from wall
-int iLastRDist = 1000;
-
+// int for keeping track of encoder distance
 int iThisCurDist = 0;
+
+// number to subtract off of gyro readings
+double dSubData;
 
 // flag if calibrated
 bool isCalibrated = false;
-
-// global x and y positions
-double dXPosition = 0;
-double dYPosition = 0;
-
 
 // state machine enumeration
 enum STATE{
@@ -94,8 +99,7 @@ enum STATE{
   WallCorner0,
   WallCorner1,
   WallCorner2,
-  WallCorner3,
-  WallCorner4,
+  WallCorner3
 };
 
 // beginning state of the robot
@@ -107,6 +111,15 @@ void setup() {
   Serial.begin(9600);
   Wire.begin();
 
+  s_SetData.iSetAngle = 0;
+  s_SetData.iSetFrontDist = 5;
+  s_SetData.iSetRightDist = 3;
+
+  s_GlobalPos.dAngle = 0;
+  s_GlobalPos.dAngleOld = 0;
+  s_GlobalPos.dXPosition = 0;
+  s_GlobalPos.dYPosition = 0;
+
   // initialization of the drive train stuff
   DriveTrain.initDrive();
   DriveTrain.initTurnPID(3, .001, 5);
@@ -117,20 +130,20 @@ void setup() {
   RobotTurret.initTurret();
 
   initLightSensor();
-  Serial.println("light init success");
+  Serial.println("Light Init success");
 
   pinMode(iInterruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(iInterruptPin), setDrive, FALLING);
 
+  pinMode(iREchoPin, INPUT);
+  pinMode(iRTrigPin, OUTPUT);
+
   // initialization of the gyro
   if (!gyro.init())
   {
-    //Serial.println("Failed to autodetect gyro type! Turn on the Robot Dumbass");
+    Serial.println("Failed to autodetect gyro type! Turn on the Robot Dumbass");
     while (1);
   }
-
-  pinMode(iREchoPin, INPUT);
-  pinMode(iRTrigPin, OUTPUT);
   
   gyro.enableDefault();
 }
@@ -141,10 +154,13 @@ void loop() {
 
   // if the time is 100 milliseconds approx then recalcuate the sensor data
   if((iCurTime - iLastTime) > 100){
+    // calculate the angle of the robot
     calcDegree(); 
     // set last time through the loop
     iLastTime = iCurTime;
+    // calculate the ranges of the range finders
     calcRange();
+    // update the light sensor data
     updateLightValues();
   }
 
@@ -165,6 +181,7 @@ void loop() {
 
           Serial.println("Ready to go Captain");
         }
+        
         if(digitalRead(iInterruptPin) == 0){
           rState = FindWall;
         }
@@ -172,13 +189,13 @@ void loop() {
 
       case FindWall:
         // sensor fusion of gyro and front range finder and right range finder
-        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iSetDist, iFrontRange, 0, 0);
+        DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, s_SetData.iSetFrontDist, s_SensorData.iFrontRange, 0, 0);
 
         calcDistance();
         resetEncoderVal(&rEncoder, &lEncoder);
         
         // count number of successes on this PID loop
-        if(abs(iFrontRange - iSetDist) < 2) iSuccessCounter++;
+        if(abs(s_SensorData.iFrontRange - s_SetData.iSetFrontDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
         // if the number of successes is sufficient, then continue onto next state
@@ -186,7 +203,7 @@ void loop() {
           iSuccessCounter = 0;
           rState = CornerTurning;
           rLastState = FindWall;
-          iSetAngle = dAngle + 90;
+          s_SetData.iSetAngle = s_GlobalPos.dAngle + 90;
 
           DriveTrain.resetPID();
         }
@@ -194,28 +211,32 @@ void loop() {
 
       case RightWallFollow:
         // sensor fusion of gyro and front range finder and right range finder
-        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iSetDist, iFrontRange, iSetRDist, iRightRange);
+        DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, 
+                                                  s_SetData.iSetFrontDist, s_SensorData.iFrontRange, 
+                                                  s_SetData.iSetRightDist, s_SensorData.iRightRange);
 
         calcDistance();
         resetEncoderVal(&rEncoder, &lEncoder);
         
         // count number of successes on this PID loop
-        if(abs(iFrontRange - iSetDist) < 2) iSuccessCounter++;
+        if(abs(s_SensorData.iFrontRange - s_SetData.iSetFrontDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
         // check to see if we came to wall edge
-        if(iRightRange > 20){
+        if(s_SensorData.iRightRange > 20){
           rState = WallCorner0;
           rLastState = RightWallFollow;
-          iSetDist = 3;
-        }else iLastRDist = iRightRange;
-
+          s_SetData.iSetFrontDist = 3;
+        }else{
+          s_SensorData.iLastRightRange = s_SensorData.iRightRange;
+        }
+        
         // if the number of successes is sufficient, then continue onto next state
         if(iSuccessCounter == iNumValidSuccesses){
           iSuccessCounter = 0;
           rState = CornerTurning;
           rLastState = RightWallFollow;
-          iSetAngle = dAngle + 90;
+          s_SetData.iSetAngle = s_GlobalPos.dAngle + 90;
 
           DriveTrain.resetPID();
         }
@@ -223,23 +244,23 @@ void loop() {
 
       case CornerTurning:
         // turn to angle desired
-        DriveTrain.TurnTo(iSetAngle, dAngle);
+        DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
         
-        if(abs(iSetAngle - dAngle) < 2) iSuccessCounter++;
+        if(abs(s_SetData.iSetAngle - s_GlobalPos.dAngle) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
         if(iSuccessCounter == iNumValidSuccesses && rLastState == WallEdgeTurning){
           rState = WallEdgeTurning;
           rLastState = CornerTurning;
           iSuccessCounter = 0;
-          iSetDist = 8;
+          s_SetData.iSetFrontDist = 8;
           DriveTrain.resetPID();
         }else if(iSuccessCounter == iNumValidSuccesses && (rLastState == RightWallFollow || rLastState == FindWall)){
           rState = RightWallFollow;
           rLastState = CornerTurning;
           iSuccessCounter = 0;
           DriveTrain.resetPID();
-          iLastRDist = 1000;
+          s_SensorData.iLastRightRange = 1000;
         }
       break;
 
@@ -262,9 +283,9 @@ void loop() {
       case WallCorner0:
         //Serial.println("Wall Corner");
         iThisCurDist = returnDistance(&rEncoder);
-        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iThisCurDist, iSetDist, 0, 0);
+        DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
          
-        if(abs(iThisCurDist - iSetDist) < 2) iSuccessCounter++;
+        if(abs(iThisCurDist - s_SetData.iSetFrontDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
         // if the number of successes is sufficient, then continue onto next state
@@ -272,7 +293,7 @@ void loop() {
           iSuccessCounter = 0;
           rState = WallCorner1;
           rLastState = WallCorner0;
-          iSetAngle = dAngle - 90;
+          s_SetData.iSetAngle = s_GlobalPos.dAngle - 90;
 
           calcDistance();
           resetEncoderVal(&rEncoder, &lEncoder);
@@ -283,16 +304,16 @@ void loop() {
 
       case WallCorner1:
         // turn to angle desired
-        DriveTrain.TurnTo(iSetAngle, dAngle);
+        DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
         
-        if(abs(iSetAngle - dAngle) < 2) iSuccessCounter++;
+        if(abs(s_SetData.iSetAngle - s_GlobalPos.dAngle) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
         if(iSuccessCounter == iNumValidSuccesses){
           rState = WallCorner2;
           rLastState = WallCorner1;
           iSuccessCounter = 0;
-          iSetDist = 7;
+          s_SetData.iSetFrontDist = 7;
           DriveTrain.resetPID();
           
           resetEncoderVal(&rEncoder, &lEncoder);
@@ -301,16 +322,16 @@ void loop() {
 
       case WallCorner2:
         iThisCurDist = returnDistance(&rEncoder);
-        DriveTrain.DriveToAngleDistanceFromRWall(iSetAngle, dAngle, iThisCurDist, iSetDist, 0, 0);
+        DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
          
-        if(abs(iThisCurDist - iSetDist) < 2) iSuccessCounter++;
+        if(abs(iThisCurDist - s_SetData.iSetFrontDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
         // if the number of successes is sufficient, then continue onto next state
         if(iSuccessCounter == iNumValidSuccesses){
-          if(iRightRange > 10){
+          if(s_SensorData.iRightRange > 10){
             rState = WallCorner3;
-            iSetAngle = dAngle - 90;
+            s_SetData.iSetAngle = s_GlobalPos.dAngle - 90;
           }else{
             rState = RightWallFollow;
           }
@@ -326,16 +347,16 @@ void loop() {
 
       case WallCorner3:
         // turn to angle desired
-        DriveTrain.TurnTo(iSetAngle, dAngle);
+        DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
         
-        if(abs(iSetAngle - dAngle) < 2) iSuccessCounter++;
+        if(abs(s_SetData.iSetAngle - s_GlobalPos.dAngle) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
         if(iSuccessCounter == iNumValidSuccesses){
           rState = FindWall;
           rLastState = WallCorner3;
           iSuccessCounter = 0;
-          iSetDist = 5;
+          s_SetData.iSetFrontDist = 5;
           DriveTrain.resetPID();
           
           resetEncoderVal(&rEncoder, &lEncoder);
@@ -349,15 +370,6 @@ void loop() {
 
     iLastSwitchTime = iCurTime;
   }
-
-  Serial.print(" X: ");
-  Serial.print(Ix[0]);
-  Serial.print(" Y: ");
-  Serial.println(Iy[0]);
-//  Serial.print(" FrontRange: ");
-//  Serial.print(iFrontRange);
-//  Serial.print(" dAngle: ");
-//  Serial.println(dAngle);
 }
 
 double calibrateGyro(){
@@ -379,14 +391,14 @@ double calibrateGyro(){
 
 void calcDegree(){
   gyro.read();
-  dAngle = ((gyro.g.x) - dSubData) * .00955;
-  dAngle = dAngle * .1;
-  dAngle += dAngleOld;
-  dAngleOld = dAngle;
+  s_GlobalPos.dAngle = ((gyro.g.x) - dSubData) * .00955;
+  s_GlobalPos.dAngle = s_GlobalPos.dAngle * .1;
+  s_GlobalPos.dAngle += s_GlobalPos.dAngleOld;
+  s_GlobalPos.dAngleOld = s_GlobalPos.dAngle;
 }
 
 void calcRange(){
-  iFrontRange = (sFrontSonic.getDistance()) / 2.54;
+  s_SensorData.iFrontRange = (sFrontSonic.getDistance()) / 2.54;
 
   digitalWrite(iRTrigPin, LOW);
   delayMicroseconds(2);
@@ -395,7 +407,7 @@ void calcRange(){
   digitalWrite(iRTrigPin, LOW);
 
   int duration = pulseIn(iREchoPin, HIGH);
-  iRightRange = (duration/74/2);
+  s_SensorData.iRightRange = (duration/74/2);
 }
 
 void updateLightValues(){
@@ -404,7 +416,9 @@ void updateLightValues(){
   Wire.write(0x36);
   Wire.endTransmission();
 
-  Wire.requestFrom(slaveAddress, 16);        // Request the 2 byte heading (MSB comes first)
+  // Request the 2 byte heading (MSB comes first)
+  Wire.requestFrom(slaveAddress, 16);
+  // Reset the array of 
   for (i=0;i<16;i++) { data_buf[i]=0; }
   i=0;
   while(Wire.available() && i < 16) {
@@ -414,27 +428,9 @@ void updateLightValues(){
 
   Ix[0] = data_buf[1];
   Iy[0] = data_buf[2];
-  s   = data_buf[3];
+  s     = data_buf[3];
   Ix[0] += (s & 0x30) <<4;
   Iy[0] += (s & 0xC0) <<2;
-
-  Ix[1] = data_buf[4];
-  Iy[1] = data_buf[5];
-  s   = data_buf[6];
-  Ix[1] += (s & 0x30) <<4;
-  Iy[1] += (s & 0xC0) <<2;
-
-  Ix[2] = data_buf[7];
-  Iy[2] = data_buf[8];
-  s   = data_buf[9];
-  Ix[2] += (s & 0x30) <<4;
-  Iy[2] += (s & 0xC0) <<2;
-
-  Ix[3] = data_buf[10];
-  Iy[3] = data_buf[11];
-  s   = data_buf[12];
-  Ix[3] += (s & 0x30) <<4;
-  Iy[3] += (s & 0xC0) <<2;
 }
 
 void initLightSensor(){
@@ -463,10 +459,9 @@ void setDrive(){
 
 void calcDistance(){
   double dRTraveled  = returnDistance(&rEncoder);
-  //double dLTraveled  = returnDistance(&lEncoder);
-  double dBotTraveled = dRTraveled; //(dRTraveled + dLTraveled) / 2;
-  double dAngleRad = dAngle * 0.0174533;
+  double dBotTraveled = dRTraveled;
+  double dAngleRad = s_GlobalPos.dAngle * 0.0174533;
   
-  dXPosition += dBotTraveled * cos(dAngleRad);
-  dYPosition += dBotTraveled * sin(dAngleRad);
+  s_GlobalPos.dXPosition += dBotTraveled * cos(dAngleRad);
+  s_GlobalPos.dYPosition += dBotTraveled * sin(dAngleRad);
 }

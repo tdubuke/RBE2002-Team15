@@ -26,7 +26,7 @@ public:
   void ArmFan();
 
   void doSweep();
-  void alignPan(int flameRead);
+  boolean alignPan(int flameRead);
   
   int getAngle();
   

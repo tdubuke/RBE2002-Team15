@@ -5,5 +5,5 @@
 #include <Arduino.h>
 
 void resetEncoderVal(Encoder *eREncoder, Encoder *eLEncoder);
-//void addToGlobalXPos(Encoder eREncoder, Encoder eREncoder, float ffXPosition);
 double returnDistance(Encoder *eEncoder);
+//void calcDistance(struct GlobalPos *s_GlobalPos, Encoder *rEncoder);

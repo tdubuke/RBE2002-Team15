@@ -2,24 +2,20 @@
 // File to be used to hold functions not part of a class
 #include "Stdfun.h"
 
+/**
+ * Reset Encoders
+ * @param *eREncoder The Pointer to the right encoder
+ * @param *eLEncoder The Pointer to the left encoder
+ */
 void resetEncoderVal(Encoder *eREncoder, Encoder *eLEncoder){
   eREncoder->write(0);
   eLEncoder->write(0);
 }
-/*
-void addToGlobalXPos(Encoder eREncoder, Encoder eREncoder, float ffXPosition){
-  //change one to positive
-  int iRXTick = eREncoder.read()
-  int iLXTick = eLEncoder.read()
 
-  float ffAvgTicks = (iRXTick + iLXTick) / 2;
-
-  ffXPosition = ffXPosition + ffAvgTicks;
-
-
-}
-*/
-
+/**
+ * Returns the distance that has been traveled by the encoder since the last reset in inches
+ * @param *eEncoder The Pointer to the encoder to calculate
+ */
 double returnDistance(Encoder *eEncoder){
   double ticks = eEncoder->read();
 
@@ -27,3 +23,15 @@ double returnDistance(Encoder *eEncoder){
 
   return distance;
 }
+
+/**
+ * Calculate the distance traveled and update the global position
+ */
+//void calcDistance(struct GlobalPos *s_GlobalPos, Encoder *rEncoder){
+//  double dRTraveled  = returnDistance(rEncoder);
+//  double dBotTraveled = dRTraveled;
+//  double dAngleRad = s_GlobalPos.dAngle * 0.0174533;
+//  
+//  s_GlobalPos.dXPosition += dBotTraveled * cos(dAngleRad);
+//  s_GlobalPos.dYPosition += dBotTraveled * sin(dAngleRad);
+//}
