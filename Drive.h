@@ -27,6 +27,8 @@ public:
 
   void DriveTo(int iSetDist, int iCurDist);
   int PIDDistance(int iSetDist, int iCurDist);
+
+  void StopMotors();
 private:
   int iRightDrivePin, iLeftDrivePin;
   

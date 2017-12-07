@@ -10,6 +10,11 @@ Drive::Drive(int iRDrive, int iLDrive){
   iLeftDrivePin = iLDrive;
 }
 
+void Drive::StopMotors(){
+  sRightDrive.write(90);
+  sLeftDrive.write(90);
+}
+
 void Drive::resetPID(){
   iTurnSumError = 0;
   iRWallSumError = 0;

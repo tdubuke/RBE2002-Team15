@@ -51,16 +51,16 @@ void Turret::doSweep(){
   }
   
   if(dir == RIGHT){
-    digitalWrite(8,HIGH);
+    digitalWrite(iPanDir,HIGH);
     iAngle += STEP_ANGLE;
   }
   else if(dir == LEFT){
-    digitalWrite(8,LOW);
+    digitalWrite(iPanDir,LOW);
     iAngle -= STEP_ANGLE;
   }
   
-  digitalWrite(5,HIGH);
-  digitalWrite(5,LOW);
+  digitalWrite(iPanStep,HIGH);
+  digitalWrite(iPanStep,LOW);
 }
 
 //On every call,
@@ -68,27 +68,30 @@ void Turret::doSweep(){
 //where the turret aligns with front of robot
 //return if flameRead is within error band of 512
 boolean Turret::alignPan(int flameRead){
-  int errorBand = 4; //amount of tolerance on the read value
+  int errorBand = 10; //amount of tolerance on the read value
   
   if(flameRead < 512){
     //meaning the flame is to the left of us
     dir = LEFT;
-    digitalWrite(8,LOW);
+    digitalWrite(iPanDir,HIGH);
   }
   else if(flameRead > 512){
     //the flame is to the right of us
     dir = RIGHT;
-    digitalWrite(8,HIGH);
+    digitalWrite(iPanDir,LOW);
   }
   //if there was a zero case, this would not have been called
   
-  digitalWrite(5,HIGH);
-  digitalWrite(5,LOW);
+  digitalWrite(iPanStep,HIGH);
+  digitalWrite(iPanStep,LOW);
 
-  return (flameRead > 512 - errorBand || flameRead < 512 + errorBand);
+  return (flameRead > (512 - errorBand) && flameRead < (512 + errorBand));
   
 }
 
+void Turret::spinFan(){
+  sESC.write(150);
+}
 
 int Turret::getAngle(){
   return iAngle;

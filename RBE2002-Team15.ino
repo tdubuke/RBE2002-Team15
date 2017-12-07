@@ -10,7 +10,7 @@
 Drive DriveTrain(6, 5);                   // Drive(int iRDrive, int iLDrive)
 L3G gyro;                                 // L3G
 SharpIR sFrontSonic(GP2Y0A21YK0F, A0);    // SharpIR(char* model, int Pin)GP2Y0A21YK0F
-Turret RobotTurret(10, 11, 12);           // Turret(int iFanPin)
+Turret RobotTurret(10, 25, 24);           // Turret(int iFanPin)
 Encoder rEncoder(2, 50);                  // Robot wheel encoder for odometry
 Encoder lEncoder(3, 51);                  // Robot wheel encoder for odometry
 LiquidCrystal LCD(40,41,42,43,44,45);     // LCD display initialization
@@ -123,14 +123,17 @@ void setup() {
   // initialization of the drive train stuff
   DriveTrain.initDrive();
   DriveTrain.initTurnPID(3, .001, 5);
-  DriveTrain.initRWallPID(8, .001, 5);
+  DriveTrain.initRWallPID(10, .001, 5);
   DriveTrain.initDistPID(6, .0004, 5);
+
+  LCD.begin(16, 2);
 
   // initialization of the robot turret
   RobotTurret.initTurret();
 
   initLightSensor();
   Serial.println("Light Init success");
+  updateLCD("Light Init");
 
   pinMode(iInterruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(iInterruptPin), setDrive, FALLING);
@@ -162,10 +165,18 @@ void loop() {
     calcRange();
     // update the light sensor data
     updateLightValues();
+
+    s_SensorData.iLightSensorX = Ix[0];
+    s_SensorData.iLightSensorY = Iy[0];
   }
 
   // go through the state machine every 10 ms, not any faster
   if((iCurTime - iLastSwitchTime) > 10){
+    if(s_SensorData.iLightSensorX < 1023 || s_SensorData.iLightSensorY < 1023){
+      rState = ChickenHead;
+      DriveTrain.StopMotors();
+    }
+
     switch(rState){
       case IdleCalibrate:
         // check if calibration has been done, if so then dont do it again
@@ -173,13 +184,11 @@ void loop() {
           // calibrate the gyro
           dSubData = calibrateGyro();
 
-          // arm the fan
-          /* FUNCTION TO ARM THE FAN */
-
           // set flag that the robot has been calibrated
           isCalibrated = true;
 
           Serial.println("Ready to go Captain");
+          updateLCD("Ready to go Cap");
         }
         
         if(digitalRead(iInterruptPin) == 0){
@@ -188,6 +197,7 @@ void loop() {
       break;
 
       case FindWall:
+        RobotTurret.doSweep();
         // sensor fusion of gyro and front range finder and right range finder
         DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, s_SetData.iSetFrontDist, s_SensorData.iFrontRange, 0, 0);
 
@@ -210,6 +220,7 @@ void loop() {
       break;
 
       case RightWallFollow:
+        RobotTurret.doSweep();
         // sensor fusion of gyro and front range finder and right range finder
         DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, 
                                                   s_SetData.iSetFrontDist, s_SensorData.iFrontRange, 
@@ -223,7 +234,7 @@ void loop() {
         else iSuccessCounter = 0;
 
         // check to see if we came to wall edge
-        if(s_SensorData.iRightRange > 20){
+        if(s_SensorData.iRightRange > 10){
           rState = WallCorner0;
           rLastState = RightWallFollow;
           s_SetData.iSetFrontDist = 3;
@@ -265,7 +276,13 @@ void loop() {
       break;
 
       case ChickenHead:
-
+        if(s_SensorData.iLightSensorX < 1023){
+          if(RobotTurret.alignPan(s_SensorData.iLightSensorX)){
+            RobotTurret.spinFan();
+          }
+        }else{
+          exit(0);
+        }
       break;
 
       case Triangulate:
@@ -281,6 +298,7 @@ void loop() {
       break;
 
       case WallCorner0:
+        RobotTurret.doSweep();
         //Serial.println("Wall Corner");
         iThisCurDist = returnDistance(&rEncoder);
         DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
@@ -303,6 +321,7 @@ void loop() {
       break;
 
       case WallCorner1:
+        RobotTurret.doSweep();
         // turn to angle desired
         DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
         
@@ -321,6 +340,7 @@ void loop() {
       break;
 
       case WallCorner2:
+        RobotTurret.doSweep();
         iThisCurDist = returnDistance(&rEncoder);
         DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
          
@@ -346,6 +366,7 @@ void loop() {
       break;
 
       case WallCorner3:
+        RobotTurret.doSweep();
         // turn to angle desired
         DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
         
@@ -370,6 +391,9 @@ void loop() {
 
     iLastSwitchTime = iCurTime;
   }
+  Serial.print(s_SensorData.iLightSensorX);
+  Serial.print(" ");
+  Serial.println(s_SensorData.iLightSensorY);
 }
 
 double calibrateGyro(){
@@ -465,3 +489,19 @@ void calcDistance(){
   s_GlobalPos.dXPosition += dBotTraveled * cos(dAngleRad);
   s_GlobalPos.dYPosition += dBotTraveled * sin(dAngleRad);
 }
+
+void updateLCD(String stateString){
+  LCD.clear();
+  LCD.setCursor(0, 0);
+  LCD.print("X:");
+  LCD.setCursor(2, 0);
+  LCD.print(s_GlobalPos.dXPosition);
+  LCD.setCursor(8, 0);
+  LCD.print("Y:");
+  LCD.setCursor(10, 0);
+  LCD.print(s_GlobalPos.dYPosition);
+
+  LCD.setCursor(0, 1);
+  LCD.print(stateString); 
+}
+

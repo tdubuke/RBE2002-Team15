@@ -25,6 +25,8 @@ public:
   void initTurret();
   void ArmFan();
 
+  void spinFan();
+
   void doSweep();
   boolean alignPan(int flameRead);
   
