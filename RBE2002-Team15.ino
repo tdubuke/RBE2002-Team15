@@ -141,7 +141,7 @@ void setup() {
 
   initLightSensor();
   Serial.println("Light Init success");
-  updateLCD("Light Init");
+  updateLCD(&s_GlobalPos, "Light Init");
 
   pinMode(iREchoPin, INPUT);
   pinMode(iRTrigPin, OUTPUT);
@@ -160,6 +160,13 @@ void setup() {
   Accel_Init();
 }
 
+void checkFlame(SensorData *s_SensorData){
+  if(s_SensorData->iLightSensorX < 1023 || s_SensorData->iLightSensorY < 1023){
+    rState = AlignHead;
+    DriveTrain.StopMotors();
+  }
+}
+
 void loop() {
   // calculate the current time
   iCurTime = millis();
@@ -175,15 +182,12 @@ void loop() {
 
     // set last time through the loop
     iLastTime = iCurTime;
+
+    updateLCD(&s_GlobalPos, "Looking");
   }
 
   // go through the state machine every 10 ms, not any faster
   if((iCurTime - iLastSwitchTime) > 10){
-    if(s_SensorData.iLightSensorX < 1023 || s_SensorData.iLightSensorY < 1023){
-      rState = AlignHead;
-      DriveTrain.StopMotors();
-    }
-
     switch(rState){
       case IdleCalibrate:
         // check if calibration has been done, if so then dont do it again
@@ -194,7 +198,7 @@ void loop() {
           // set flag that the robot has been calibrated
           isCalibrated = true;
 
-          updateLCD("Ready to go Cap");
+          updateLCD(&s_GlobalPos, "Ready to go Cap");
         }
         
         if(digitalRead(iInterruptPin) == 0){
@@ -223,6 +227,8 @@ void loop() {
 
           DriveTrain.resetPID();
         }
+
+        checkFlame(&s_SensorData);
       break;
 
       case RightWallFollow:
@@ -257,6 +263,7 @@ void loop() {
 
           DriveTrain.resetPID();
         }
+        checkFlame(&s_SensorData);
       break;
 
       case CornerTurning:
@@ -291,7 +298,7 @@ void loop() {
           if(RobotTurret.alignPan(s_SensorData.iLightSensorX)){
             rState = CornerTurning;
 
-            s_SetData.iSetAngle = s_GlobalPos.dAngle + RobotTurret.getAngle();
+            s_SetData.iSetAngle = s_GlobalPos.dAngle - RobotTurret.getAngle();
           }
         }
       break;
@@ -329,6 +336,7 @@ void loop() {
           
           DriveTrain.resetPID();
         }
+        checkFlame(&s_SensorData);
       break;
 
       case WallCorner1:
@@ -349,6 +357,7 @@ void loop() {
           
           resetEncoderVal(&rEncoder, &lEncoder);
         }
+        checkFlame(&s_SensorData);
       break;
 
       case WallCorner2:
@@ -373,7 +382,7 @@ void loop() {
 
           DriveTrain.resetPID();
         }
-         
+        checkFlame(&s_SensorData);
       break;
 
       case WallCorner3:
@@ -393,6 +402,7 @@ void loop() {
           
           resetEncoderVal(&rEncoder, &lEncoder);
         }
+        checkFlame(&s_SensorData);
       break;
 
       default:
@@ -545,16 +555,16 @@ void calcDistance(GlobalPos *s_GlobalPos){
   s_GlobalPos->dYPosition += dBotTraveled * sin(dAngleRad);
 }
 
-void updateLCD(String stateString){
+void updateLCD(GlobalPos *s_GlobalPos, String stateString){
   LCD.clear();
   LCD.setCursor(0, 0);
   LCD.print("X:");
   LCD.setCursor(2, 0);
-  LCD.print(s_GlobalPos.dXPosition);
+  LCD.print(s_GlobalPos->dXPosition);
   LCD.setCursor(8, 0);
   LCD.print("Y:");
   LCD.setCursor(10, 0);
-  LCD.print(s_GlobalPos.dYPosition);
+  LCD.print(s_GlobalPos->dYPosition);
 
   LCD.setCursor(0, 1);
   LCD.print(stateString); 

@@ -70,12 +70,6 @@ void Turret::doSweep(){
 //where the turret aligns with front of robot
 //return if flameRead is within error band of 512
 boolean Turret::alignPan(int flameRead){
-<<<<<<< HEAD
-  int errorBand = 20; //amount of tolerance on the read value
-  
-  if(flameRead < 512){
-=======
-
   //evaluate if the sensor value is within an acceptable band of error
   boolean lockedOn = (flameRead > (512 - ERROR_BAND) && flameRead < (512 + ERROR_BAND));
 
@@ -85,7 +79,6 @@ boolean Turret::alignPan(int flameRead){
   }
   //if we're not locked on, figure out which direction to turn
   else if(flameRead < 512){
->>>>>>> master
     //meaning the flame is to the left of us
     dir = LEFT;
     digitalWrite(iPanDir,HIGH);
@@ -97,18 +90,10 @@ boolean Turret::alignPan(int flameRead){
     digitalWrite(iPanDir,LOW);
     iAngle += STEP_ANGLE; //update the step angle
   }
-<<<<<<< HEAD
-  //if there was a zero case, this would not have been called
 
-  if(flameRead < 512 - errorBand || flameRead > 512 + errorBand){
-    digitalWrite(iPanStep,HIGH);
-    digitalWrite(iPanStep,LOW);
-  }
-=======
   //do one step in the appropriate direction
   digitalWrite(iPanStep,HIGH);
   digitalWrite(iPanStep,LOW);
->>>>>>> master
 
   return lockedOn; //false
   
