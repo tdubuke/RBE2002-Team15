@@ -12,6 +12,8 @@
 
 #define STEP_ANGLE 1.8
 
+#define ERROR_BAND 10 //amount of tolerance on the flame read value
+
 class Turret{
 public:
   //initialize the turret with
