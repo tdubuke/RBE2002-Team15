@@ -24,6 +24,8 @@ void Turret::initTurret(){
   pinMode(iPanDir, OUTPUT);
 
   ArmFan();
+
+  iAngle = 0; //initialize iAngle to be inline with front of robot
 }
 
 /**
@@ -64,28 +66,36 @@ void Turret::doSweep(){
 }
 
 //On every call,
-//Step the turret towards iAngle = 0
+//Step the turret towards flameRead = 512
 //where the turret aligns with front of robot
 //return if flameRead is within error band of 512
 boolean Turret::alignPan(int flameRead){
-  int errorBand = 10; //amount of tolerance on the read value
-  
-  if(flameRead < 512){
+
+  //evaluate if the sensor value is within an acceptable band of error
+  boolean lockedOn = (flameRead > (512 - ERROR_BAND) && flameRead < (512 + ERROR_BAND));
+
+  //if locked on, return true and do nothing else
+  if(lockedOn){
+    return lockedOn; //true
+  }
+  //if we're not locked on, figure out which direction to turn
+  else if(flameRead < 512){
     //meaning the flame is to the left of us
     dir = LEFT;
     digitalWrite(iPanDir,HIGH);
+    iAngle -= STEP_ANGLE; //update the step angle
   }
   else if(flameRead > 512){
     //the flame is to the right of us
     dir = RIGHT;
     digitalWrite(iPanDir,LOW);
+    iAngle += STEP_ANGLE; //update the step angle
   }
-  //if there was a zero case, this would not have been called
-  
+  //do one step in the appropriate direction
   digitalWrite(iPanStep,HIGH);
   digitalWrite(iPanStep,LOW);
 
-  return (flameRead > (512 - errorBand) && flameRead < (512 + errorBand));
+  return lockedOn; //false
   
 }
 
