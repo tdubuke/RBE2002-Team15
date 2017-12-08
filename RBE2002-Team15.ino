@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <L3G.h>
+#include <LSM303.h>
 #include <SharpIR.h>
 #include "Drive.h"
 #include "Stdfun.h"
@@ -9,6 +10,7 @@
 
 Drive DriveTrain(6, 5);                   // Drive(int iRDrive, int iLDrive)
 L3G gyro;                                 // L3G
+LSM303 accel;                             // LSM303
 SharpIR sFrontSonic(GP2Y0A21YK0F, A0);    // SharpIR(char* model, int Pin)GP2Y0A21YK0F
 Turret RobotTurret(10, 25, 24);           // Turret(int iFanPin)
 Encoder rEncoder(2, 50);                  // Robot wheel encoder for odometry
@@ -152,6 +154,8 @@ void setup() {
   }
   
   gyro.enableDefault();
+
+  Accel_Init();
 }
 
 void loop() {
@@ -159,18 +163,16 @@ void loop() {
   iCurTime = millis();
 
   // if the time is 100 milliseconds approx then recalcuate the sensor data
-  if((iCurTime - iLastTime) > 100){
+  if((iCurTime - iLastTime) > 50){
     // calculate the angle of the robot
-    calcDegree(); 
+    calcDegree(&s_GlobalPos); 
+    // calculate the ranges of the range finders
+    calcRange(&s_SensorData);
+    // update the light sensor data
+    updateLightValues(&s_SensorData);
+
     // set last time through the loop
     iLastTime = iCurTime;
-    // calculate the ranges of the range finders
-    calcRange();
-    // update the light sensor data
-    updateLightValues();
-
-    s_SensorData.iLightSensorX = Ix[0];
-    s_SensorData.iLightSensorY = Iy[0];
   }
 
   // go through the state machine every 10 ms, not any faster
@@ -203,7 +205,7 @@ void loop() {
         // sensor fusion of gyro and front range finder and right range finder
         DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, s_SetData.iSetFrontDist, s_SensorData.iFrontRange, 0, 0);
 
-        calcDistance();
+        calcDistance(&s_GlobalPos);
         resetEncoderVal(&rEncoder, &lEncoder);
         
         // count number of successes on this PID loop
@@ -228,7 +230,7 @@ void loop() {
                                                   s_SetData.iSetFrontDist, s_SensorData.iFrontRange, 
                                                   s_SetData.iSetRightDist, s_SensorData.iRightRange);
 
-        calcDistance();
+        calcDistance(&s_GlobalPos);
         resetEncoderVal(&rEncoder, &lEncoder);
         
         // count number of successes on this PID loop
@@ -287,7 +289,7 @@ void loop() {
           if(RobotTurret.alignPan(s_SensorData.iLightSensorX)){
             rState = CornerTurning;
 
-            s_SetData.iSetAngle = s_GlobalPos + RobotTurret.getAngle();
+            s_SetData.iSetAngle = s_GlobalPos.dAngle + RobotTurret.getAngle();
           }
         }
       break;
@@ -320,7 +322,7 @@ void loop() {
           rLastState = WallCorner0;
           s_SetData.iSetAngle = s_GlobalPos.dAngle - 90;
 
-          calcDistance();
+          calcDistance(&s_GlobalPos);
           resetEncoderVal(&rEncoder, &lEncoder);
           
           DriveTrain.resetPID();
@@ -354,7 +356,7 @@ void loop() {
         DriveTrain.DriveToAngleDeadReckoning(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
          
         // if the number of successes is sufficient, then continue onto next state
-        if(iThisCurDist == s_SetFrontDist){
+        if(iThisCurDist == s_SetData.iSetFrontDist){
           if(s_SensorData.iRightRange > 20){
             rState = WallCorner3;
             s_SetData.iSetAngle = s_GlobalPos.dAngle - 90;
@@ -364,7 +366,7 @@ void loop() {
           
           rLastState = WallCorner2;
           
-          calcDistance();
+          calcDistance(&s_GlobalPos);
           resetEncoderVal(&rEncoder, &lEncoder);
 
           DriveTrain.resetPID();
@@ -417,16 +419,54 @@ double calibrateGyro(){
   return total/iGyroCalCycles;
 }
 
-void calcDegree(){
-  gyro.read();
-  s_GlobalPos.dAngle = ((gyro.g.x) - dSubData) * .00955;
-  s_GlobalPos.dAngle = s_GlobalPos.dAngle * .1;
-  s_GlobalPos.dAngle += s_GlobalPos.dAngleOld;
-  s_GlobalPos.dAngleOld = s_GlobalPos.dAngle;
+void Accel_Init(){
+  accel.init();
+  accel.enableDefault();
+  Serial.print("Accel Device ID");
+  Serial.println(accel.getDeviceType());
+  switch (accel.getDeviceType())
+  {
+    case LSM303::device_D:
+      accel.writeReg(LSM303::CTRL2, 0x18); // 8 g full scale: AFS = 011
+      break;
+    case LSM303::device_DLHC:
+      accel.writeReg(LSM303::CTRL_REG4_A, 0x28); // 8 g full scale: FS = 10; high resolution output mode
+      break;
+    default: // DLM, DLH
+      accel.writeReg(LSM303::CTRL_REG4_A, 0x30); // 8 g full scale: FS = 11
+  }
 }
 
-void calcRange(){
-  s_SensorData.iFrontRange = (sFrontSonic.getDistance()) / 2.54;
+void calcDegree(GlobalPos *s_GlobalPos){
+  gyro.read();
+  accel.read();
+
+  double dAngle, dAngleOld;
+  double x_Acc;
+
+  double gyroX = gyro.g.x;
+  
+  double accelY = accel.a.y >> 4;
+  double accelZ = accel.a.z >> 4;
+
+  accelY /= 256;
+  accelZ /= 256;
+  
+  s_GlobalPos->dAngle = ((gyroX) - dSubData) * .00955;
+  s_GlobalPos->dAngle = s_GlobalPos->dAngle * .05;
+  s_GlobalPos->dAngle += s_GlobalPos->dAngleOld;
+  s_GlobalPos->dAngleOld = s_GlobalPos->dAngle;
+
+  float magnitudeofAccel = (abs(accelY)+abs(accelZ));
+
+  if(magnitudeofAccel < 6 && magnitudeofAccel > 1.2){
+    x_Acc = atan2(accelY,accelZ)*180/ PI;
+    s_GlobalPos->dAngle = s_GlobalPos->dAngle * 0.98 + x_Acc * 0.02;
+  }
+}
+
+void calcRange(SensorData *s_SensorData){
+  s_SensorData->iFrontRange = (sFrontSonic.getDistance()) / 2.54;
 
   digitalWrite(iRTrigPin, LOW);
   delayMicroseconds(2);
@@ -435,10 +475,10 @@ void calcRange(){
   digitalWrite(iRTrigPin, LOW);
 
   int duration = pulseIn(iREchoPin, HIGH);
-  s_SensorData.iRightRange = (duration/74/2);
+  s_SensorData->iRightRange = (duration/74/2);
 }
 
-void updateLightValues(){
+void updateLightValues(SensorData *s_SensorData){
   //IR sensor read
   Wire.beginTransmission(slaveAddress);
   Wire.write(0x36);
@@ -459,6 +499,9 @@ void updateLightValues(){
   s     = data_buf[3];
   Ix[0] += (s & 0x30) <<4;
   Iy[0] += (s & 0xC0) <<2;
+
+  s_SensorData->iLightSensorX = Ix[0];
+  s_SensorData->iLightSensorY = Iy[0];
 }
 
 void initLightSensor(){
@@ -480,13 +523,13 @@ void Write_2bytes(byte d1, byte d2)
   Wire.endTransmission();
 }
 
-void calcDistance(){
+void calcDistance(GlobalPos *s_GlobalPos){
   double dRTraveled  = returnDistance(&rEncoder);
   double dBotTraveled = dRTraveled;
-  double dAngleRad = s_GlobalPos.dAngle * 0.0174533;
+  double dAngleRad = s_GlobalPos->dAngle * 0.0174533;
   
-  s_GlobalPos.dXPosition += dBotTraveled * cos(dAngleRad);
-  s_GlobalPos.dYPosition += dBotTraveled * sin(dAngleRad);
+  s_GlobalPos->dXPosition += dBotTraveled * cos(dAngleRad);
+  s_GlobalPos->dYPosition += dBotTraveled * sin(dAngleRad);
 }
 
 void updateLCD(String stateString){
