@@ -131,7 +131,7 @@ void setup() {
   // initialization of the drive train stuff
   DriveTrain.initDrive();
   DriveTrain.initTurnPID(3, .001, 5);
-  DriveTrain.initRWallPID(10, .001, 5);
+  DriveTrain.initRWallPID(5, .001, 5);
   DriveTrain.initDistPID(6, .0004, 5);
 
   LCD.begin(16, 2);
@@ -295,7 +295,7 @@ void loop() {
       break;
 
       case ChickenHead:
-        
+        exit(0);
       break;
 
       case Triangulate:
@@ -398,6 +398,17 @@ void loop() {
       break;
     }
 
+//    Serial.print("Angle: ");
+//    Serial.print(s_GlobalPos.dAngle);
+//    Serial.print(" IR X: ");
+//    Serial.print(s_SensorData.iLightSensorX);
+//    Serial.print(" IR Y: ");
+//    Serial.print(s_SensorData.iLightSensorY);
+//    Serial.print(" Front Range ");
+//    Serial.print(s_SensorData.iFrontRange);
+//    Serial.print(" Right Range ");
+//    Serial.print(s_SensorData.iRightRange);
+//    Serial.println();
     iLastSwitchTime = iCurTime;
   }
 }
