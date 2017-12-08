@@ -68,7 +68,7 @@ void Turret::doSweep(){
 //where the turret aligns with front of robot
 //return if flameRead is within error band of 512
 boolean Turret::alignPan(int flameRead){
-  int errorBand = 10; //amount of tolerance on the read value
+  int errorBand = 20; //amount of tolerance on the read value
   
   if(flameRead < 512){
     //meaning the flame is to the left of us
@@ -81,9 +81,11 @@ boolean Turret::alignPan(int flameRead){
     digitalWrite(iPanDir,LOW);
   }
   //if there was a zero case, this would not have been called
-  
-  digitalWrite(iPanStep,HIGH);
-  digitalWrite(iPanStep,LOW);
+
+  if(flameRead < 512 - errorBand || flameRead > 512 + errorBand){
+    digitalWrite(iPanStep,HIGH);
+    digitalWrite(iPanStep,LOW);
+  }
 
   return (flameRead > (512 - errorBand) && flameRead < (512 + errorBand));
   

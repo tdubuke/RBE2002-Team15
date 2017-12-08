@@ -13,8 +13,8 @@ L3G gyro;                                 // L3G
 LSM303 accel;                             // LSM303
 SharpIR sFrontSonic(GP2Y0A21YK0F, A0);    // SharpIR(char* model, int Pin)GP2Y0A21YK0F
 Turret RobotTurret(10, 25, 24);           // Turret(int iFanPin)
-Encoder rEncoder(2, 50);                  // Robot wheel encoder for odometry
-Encoder lEncoder(3, 51);                  // Robot wheel encoder for odometry
+Encoder rEncoder(3, 51);                  // Robot wheel encoder for odometry
+Encoder lEncoder(2, 50);                  // Robot wheel encoder for odometry
 LiquidCrystal LCD(40,41,42,43,44,45);     // LCD display initialization
 
 const int iRightLine = 1;                 // saving the analog port of the right line sensor 
@@ -120,7 +120,7 @@ void setup() {
   Wire.begin();
 
   s_SetData.iSetAngle = 0;
-  s_SetData.iSetFrontDist = 5;
+  s_SetData.iSetFrontDist = 3;
   s_SetData.iSetRightDist = 3;
 
   s_GlobalPos.dAngle = 0;
@@ -130,9 +130,9 @@ void setup() {
 
   // initialization of the drive train stuff
   DriveTrain.initDrive();
-  DriveTrain.initTurnPID(3, .001, 5);
+  DriveTrain.initTurnPID(3, .001, 3);
   DriveTrain.initRWallPID(5, .001, 5);
-  DriveTrain.initDistPID(6, .0004, 5);
+  DriveTrain.initDistPID(7, .0004, 5);
 
   LCD.begin(16, 2);
 
@@ -145,6 +145,8 @@ void setup() {
 
   pinMode(iREchoPin, INPUT);
   pinMode(iRTrigPin, OUTPUT);
+
+  pinMode(iInterruptPin, INPUT_PULLUP);
 
   // initialization of the gyro
   if (!gyro.init())
@@ -241,7 +243,7 @@ void loop() {
         if(s_SensorData.iRightRange > 10){
           rState = WallCorner0;
           rLastState = RightWallFollow;
-          s_SetData.iSetFrontDist = 3;
+          s_SetData.iSetFrontDist = 2;
         }else{
           s_SensorData.iLastRightRange = s_SensorData.iRightRange;
         }
@@ -295,7 +297,7 @@ void loop() {
       break;
 
       case ChickenHead:
-        exit(0);
+        
       break;
 
       case Triangulate:
@@ -398,10 +400,10 @@ void loop() {
       break;
     }
 
-//    Serial.print("Angle: ");
-//    Serial.print(s_GlobalPos.dAngle);
-//    Serial.print(" IR X: ");
-//    Serial.print(s_SensorData.iLightSensorX);
+//    Serial.print("X:");
+//    Serial.print(s_GlobalPos.dXPosition);
+//    Serial.print(" Y: ");
+//    Serial.println(s_GlobalPos.dYPosition);
 //    Serial.print(" IR Y: ");
 //    Serial.print(s_SensorData.iLightSensorY);
 //    Serial.print(" Front Range ");

@@ -99,8 +99,8 @@ void Drive::DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSet
   if(iMotorSpeed > 30) iMotorSpeed = 30;
   else if(iMotorSpeed < -30) iMotorSpeed = -30;
   
-  if(iMotorOffset > 30) iMotorOffset = 30;
-  else if(iMotorOffset < -30) iMotorOffset = -30;
+  if(iMotorOffset > 10) iMotorOffset = 10;
+  else if(iMotorOffset < -10) iMotorOffset = -10;
 
   if(iMotorWallOffset > 30) iMotorWallOffset = 30;
   else if(iMotorWallOffset < -30) iMotorWallOffset = -30;
@@ -114,11 +114,11 @@ void Drive::DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSet
  */
 void Drive::DriveToAngleDeadReckoning(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist){
   int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
-  int iMotorSpeed = -20;
+  int iMotorSpeed = -30;
   int iMotorWallOffset = PIDRightWall(iSetRightDist, iCurRightDist);
 
-  if(iMotorOffset > 30) iMotorOffset = 30;
-  else if(iMotorOffset < -30) iMotorOffset = -30;
+  if(iMotorOffset > 10) iMotorOffset = 10;
+  else if(iMotorOffset < -10) iMotorOffset = -10;
 
   if(iMotorWallOffset > 30) iMotorWallOffset = 30;
   else if(iMotorWallOffset < -30) iMotorWallOffset = -30;
