@@ -15,12 +15,14 @@ void Drive::StopMotors(){
   sLeftDrive.write(90);
 }
 
+/**
+ * Reset all the variables for the PID and turn off the motors
+ */
 void Drive::resetPID(){
   iTurnSumError = 0;
   iRWallSumError = 0;
   iDistSumError = 0;
-  sRightDrive.write(90);
-  sLeftDrive.write(90);
+  this->StopMotors();
 }
 
 /**
@@ -97,6 +99,24 @@ void Drive::DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSet
   if(iMotorSpeed > 30) iMotorSpeed = 30;
   else if(iMotorSpeed < -30) iMotorSpeed = -30;
   
+  if(iMotorOffset > 30) iMotorOffset = 30;
+  else if(iMotorOffset < -30) iMotorOffset = -30;
+
+  if(iMotorWallOffset > 30) iMotorWallOffset = 30;
+  else if(iMotorWallOffset < -30) iMotorWallOffset = -30;
+  
+  sRightDrive.write(90 - iMotorSpeed + iMotorOffset + iMotorWallOffset);
+  sLeftDrive.write(90 + iMotorSpeed + iMotorOffset + iMotorWallOffset);
+}
+
+/**
+ * Dead Reckon drive to angle
+ */
+void Drive::DriveToAngleDeadReckoning(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist){
+  int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
+  int iMotorSpeed = 20;
+  int iMotorWallOffset = PIDRightWall(iSetRightDist, iCurRightDist);
+
   if(iMotorOffset > 30) iMotorOffset = 30;
   else if(iMotorOffset < -30) iMotorOffset = -30;
 

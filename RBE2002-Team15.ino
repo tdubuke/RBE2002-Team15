@@ -15,12 +15,17 @@ Encoder rEncoder(2, 50);                  // Robot wheel encoder for odometry
 Encoder lEncoder(3, 51);                  // Robot wheel encoder for odometry
 LiquidCrystal LCD(40,41,42,43,44,45);     // LCD display initialization
 
+const int iRightLine = 1;                 // saving the analog port of the right line sensor 
+const int iLeftLine = 2;                  // saving the analog port of the left line sensor
+
 struct SensorData{
   int iLightSensorX;
   int iLightSensorY;
   int iFrontRange;
   int iRightRange;
   int iLastRightRange;
+  int iRightLine;
+  int iLeftLine;
 };
 
 struct SetData{
@@ -92,6 +97,7 @@ enum STATE{
   WallEdgeTurning,
   DriveToEncoder,
   CornerTurning,
+  AlignHead,
   ChickenHead,
   Triangulate,
   FlameApproach,
@@ -135,9 +141,6 @@ void setup() {
   Serial.println("Light Init success");
   updateLCD("Light Init");
 
-  pinMode(iInterruptPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(iInterruptPin), setDrive, FALLING);
-
   pinMode(iREchoPin, INPUT);
   pinMode(iRTrigPin, OUTPUT);
 
@@ -173,7 +176,7 @@ void loop() {
   // go through the state machine every 10 ms, not any faster
   if((iCurTime - iLastSwitchTime) > 10){
     if(s_SensorData.iLightSensorX < 1023 || s_SensorData.iLightSensorY < 1023){
-      rState = ChickenHead;
+      rState = AlignHead;
       DriveTrain.StopMotors();
     }
 
@@ -187,7 +190,6 @@ void loop() {
           // set flag that the robot has been calibrated
           isCalibrated = true;
 
-          Serial.println("Ready to go Captain");
           updateLCD("Ready to go Cap");
         }
         
@@ -272,17 +274,26 @@ void loop() {
           iSuccessCounter = 0;
           DriveTrain.resetPID();
           s_SensorData.iLastRightRange = 1000;
+        }else if(iSuccessCounter == iNumValidSuccesses && rLastState == ChickenHead){
+          rState = ChickenHead;
+          rLastState = CornerTurning;
+          iSuccessCounter = 0;
+          DriveTrain.resetPID();
+        }
+      break;
+
+      case AlignHead:
+        if(s_SensorData.iLightSensorX < 1023){
+          if(RobotTurret.alignPan(s_SensorData.iLightSensorX)){
+            rState = CornerTurning;
+
+            s_SetData.iSetAngle = s_GlobalPos + RobotTurret.getAngle();
+          }
         }
       break;
 
       case ChickenHead:
-        if(s_SensorData.iLightSensorX < 1023){
-          if(RobotTurret.alignPan(s_SensorData.iLightSensorX)){
-            RobotTurret.spinFan();
-          }
-        }else{
-          exit(0);
-        }
+        
       break;
 
       case Triangulate:
@@ -299,16 +310,12 @@ void loop() {
 
       case WallCorner0:
         RobotTurret.doSweep();
-        //Serial.println("Wall Corner");
+        
         iThisCurDist = returnDistance(&rEncoder);
-        DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
-         
-        if(abs(iThisCurDist - s_SetData.iSetFrontDist) < 2) iSuccessCounter++;
-        else iSuccessCounter = 0;
+        DriveTrain.DriveToAngleDeadReckoning(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
 
         // if the number of successes is sufficient, then continue onto next state
-        if(iSuccessCounter == iNumValidSuccesses){
-          iSuccessCounter = 0;
+        if(iThisCurDist == s_SetData.iSetFrontDist){
           rState = WallCorner1;
           rLastState = WallCorner0;
           s_SetData.iSetAngle = s_GlobalPos.dAngle - 90;
@@ -322,6 +329,7 @@ void loop() {
 
       case WallCorner1:
         RobotTurret.doSweep();
+        
         // turn to angle desired
         DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
         
@@ -341,26 +349,25 @@ void loop() {
 
       case WallCorner2:
         RobotTurret.doSweep();
+        
         iThisCurDist = returnDistance(&rEncoder);
-        DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
+        DriveTrain.DriveToAngleDeadReckoning(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
          
-        if(abs(iThisCurDist - s_SetData.iSetFrontDist) < 2) iSuccessCounter++;
-        else iSuccessCounter = 0;
-
         // if the number of successes is sufficient, then continue onto next state
-        if(iSuccessCounter == iNumValidSuccesses){
-          if(s_SensorData.iRightRange > 10){
+        if(iThisCurDist == s_SetFrontDist){
+          if(s_SensorData.iRightRange > 20){
             rState = WallCorner3;
             s_SetData.iSetAngle = s_GlobalPos.dAngle - 90;
           }else{
             rState = RightWallFollow;
           }
+          
           rLastState = WallCorner2;
-          iSuccessCounter = 0;
-          DriveTrain.resetPID();
           
           calcDistance();
           resetEncoderVal(&rEncoder, &lEncoder);
+
+          DriveTrain.resetPID();
         }
          
       break;
@@ -391,9 +398,6 @@ void loop() {
 
     iLastSwitchTime = iCurTime;
   }
-  Serial.print(s_SensorData.iLightSensorX);
-  Serial.print(" ");
-  Serial.println(s_SensorData.iLightSensorY);
 }
 
 double calibrateGyro(){
@@ -474,11 +478,6 @@ void Write_2bytes(byte d1, byte d2)
   Wire.beginTransmission(slaveAddress);
   Wire.write(d1); Wire.write(d2);
   Wire.endTransmission();
-  Serial.println("light init success");
-}
-
-void setDrive(){
-  //exit(0);
 }
 
 void calcDistance(){
