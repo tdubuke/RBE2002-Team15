@@ -45,24 +45,13 @@ void Turret::ArmFan(){
 void Turret::doSweep(){
   if(iAngle >= 45){
     iAngle = 45;
-    dir = LEFT;
+    dir = RIGHT;
   }
   else if(iAngle <= -45){
     iAngle = -45;
-    dir = RIGHT;
+    dir = LEFT;
   }
-  
-  if(dir == RIGHT){
-    digitalWrite(iPanDir,HIGH);
-    iAngle += STEP_ANGLE;
-  }
-  else if(dir == LEFT){
-    digitalWrite(iPanDir,LOW);
-    iAngle -= STEP_ANGLE;
-  }
-  
-  digitalWrite(iPanStep,HIGH);
-  digitalWrite(iPanStep,LOW);
+  doStep(dir);
 }
 
 //On every call,
@@ -80,21 +69,12 @@ boolean Turret::alignPan(int flameRead){
   //if we're not locked on, figure out which direction to turn
   else if(flameRead < 512){
     //meaning the flame is to the left of us
-    dir = LEFT;
-    digitalWrite(iPanDir,HIGH);
-    iAngle -= STEP_ANGLE; //update the step angle
+    doStep(LEFT);
   }
   else if(flameRead > 512){
     //the flame is to the right of us
-    dir = RIGHT;
-    digitalWrite(iPanDir,LOW);
-    iAngle += STEP_ANGLE; //update the step angle
+    doStep(RIGHT);
   }
-
-  //do one step in the appropriate direction
-  digitalWrite(iPanStep,HIGH);
-  digitalWrite(iPanStep,LOW);
-
   return lockedOn; //false
   
 }
@@ -104,6 +84,43 @@ void Turret::spinFan(){
 }
 
 int Turret::getAngle(){
+  return iAngle;
+}
+
+//rotate the turret back to coordinate system zero
+//return its current angle
+int Turret::alignToZero(){
+  if(iAngle == 0){
+    return 0;
+  }
+  else if(iAngle > 0){
+    //if we are on the right side of the sweep, go left
+    doStep(LEFT);
+  }
+  else if(iAngle < 0){
+    //if we are on the left side of the sweep, go right
+    doStep(RIGHT);
+  }
+  return iAngle;
+}
+
+//do a step in the given direction, goDirection
+//update the global angle, iAngle
+//return our resultant angle
+int Turret::doStep(boolean goDirection){
+  dir = goDirection;
+  if(goDirection == LEFT){
+    digitalWrite(iPanDir,HIGH); //set stepper to left direction
+    iAngle += STEP_ANGLE; //update the step angle
+  }
+  else if (goDirection == RIGHT){
+    digitalWrite(iPanDir, LOW); //set stepper to right direction
+    iAngle -= STEP_ANGLE; //update the step angle
+  }
+  //do one step
+  digitalWrite(iPanStep,HIGH);
+  digitalWrite(iPanStep,LOW);
+  //return angle
   return iAngle;
 }
 

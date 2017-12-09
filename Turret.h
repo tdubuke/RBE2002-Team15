@@ -33,6 +33,8 @@ public:
   boolean alignPan(int flameRead);
   
   int getAngle();
+
+  int alignToZero();
   
 private:
   Servo sESC;
@@ -45,6 +47,8 @@ private:
   //will compare this to LEFT or RIGHT
 
   int iAngle;
+
+  int doStep(boolean dir);
 };
 
 #endif
