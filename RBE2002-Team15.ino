@@ -130,7 +130,7 @@ void setup() {
 
   // initialization of the drive train stuff
   DriveTrain.initDrive();
-  DriveTrain.initTurnPID(3, .001, 3);
+  DriveTrain.initTurnPID(2.8, .001, 4);
   DriveTrain.initRWallPID(5, .001, 5);
   DriveTrain.initDistPID(7, .0004, 5);
 
@@ -180,10 +180,10 @@ void loop() {
     // update the light sensor data
     updateLightValues(&s_SensorData);
 
+    updateLCD(&s_GlobalPos, "Looking");
+
     // set last time through the loop
     iLastTime = iCurTime;
-
-    updateLCD(&s_GlobalPos, "Looking");
   }
 
   // go through the state machine every 10 ms, not any faster
@@ -285,7 +285,7 @@ void loop() {
           iSuccessCounter = 0;
           DriveTrain.resetPID();
           s_SensorData.iLastRightRange = 1000;
-        }else if(iSuccessCounter == iNumValidSuccesses && rLastState == ChickenHead){
+        }else if(iSuccessCounter == iNumValidSuccesses && rLastState == AlignHead){
           rState = ChickenHead;
           rLastState = CornerTurning;
           iSuccessCounter = 0;
@@ -297,6 +297,7 @@ void loop() {
         if(s_SensorData.iLightSensorX < 1023){
           if(RobotTurret.alignPan(s_SensorData.iLightSensorX)){
             rState = CornerTurning;
+            rLastState = AlignHead;
 
             s_SetData.iSetAngle = s_GlobalPos.dAngle - RobotTurret.getAngle();
           }
@@ -304,7 +305,7 @@ void loop() {
       break;
 
       case ChickenHead:
-        
+        if(RobotTurret.alignToZero() == 0) rState = Triangulate;
       break;
 
       case Triangulate:

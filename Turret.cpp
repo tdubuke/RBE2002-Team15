@@ -95,11 +95,11 @@ int Turret::alignToZero(){
   }
   else if(iAngle > 0){
     //if we are on the right side of the sweep, go left
-    doStep(LEFT);
+    doStep(RIGHT);
   }
   else if(iAngle < 0){
     //if we are on the left side of the sweep, go right
-    doStep(RIGHT);
+    doStep(LEFT);
   }
   return iAngle;
 }
