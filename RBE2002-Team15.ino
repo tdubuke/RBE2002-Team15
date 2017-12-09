@@ -8,17 +8,17 @@
 #include <Encoder.h>
 #include <LiquidCrystal.h>
 
-Drive DriveTrain(6, 5);                   // Drive(int iRDrive, int iLDrive)
-L3G gyro;                                 // L3G
-LSM303 accel;                             // LSM303
-SharpIR sFrontSonic(GP2Y0A21YK0F, A0);    // SharpIR(char* model, int Pin)GP2Y0A21YK0F
-Turret RobotTurret(10, 25, 24);           // Turret(int iFanPin)
-Encoder rEncoder(3, 51);                  // Robot wheel encoder for odometry
-Encoder lEncoder(2, 50);                  // Robot wheel encoder for odometry
-LiquidCrystal LCD(40,41,42,43,44,45);     // LCD display initialization
+Drive DriveTrain(6, 5);                     // Drive(int iRDrive, int iLDrive)
+L3G gyro;                                   // L3G
+LSM303 accel;                               // LSM303
+SharpIR sFrontSonic(GP2Y0A21YK0F, A0);      // SharpIR(char* model, int Pin)GP2Y0A21YK0F
+Turret RobotTurret(10, 25, 24, 31, 33, 35); // Turret(int iFanPin)
+Encoder rEncoder(3, 51);                    // Robot wheel encoder for odometry
+Encoder lEncoder(2, 50);                    // Robot wheel encoder for odometry
+LiquidCrystal LCD(40,41,42,43,44,45);       // LCD display initialization
 
-const int iRightLine = 1;                 // saving the analog port of the right line sensor 
-const int iLeftLine = 2;                  // saving the analog port of the left line sensor
+const int iRightLine = 1;                   // saving the analog port of the right line sensor 
+const int iLeftLine = 2;                    // saving the analog port of the left line sensor
 
 struct SensorData{
   int iLightSensorX;
@@ -485,7 +485,7 @@ void calcDegree(GlobalPos *s_GlobalPos){
 
   if(magnitudeofAccel < 6 && magnitudeofAccel > 1.2){
     x_Acc = atan2(accelY,accelZ)*180/ PI;
-    s_GlobalPos->dAngle = s_GlobalPos->dAngle * 0.98 + x_Acc * 0.02;
+    s_GlobalPos->dAngle = s_GlobalPos->dAngle * 0.9 + x_Acc * 0.1;
   }
 }
 
@@ -568,6 +568,6 @@ void updateLCD(GlobalPos *s_GlobalPos, String stateString){
   LCD.print(s_GlobalPos->dYPosition);
 
   LCD.setCursor(0, 1);
-  LCD.print(stateString); 
+  LCD.print(s_GlobalPos->dAngle); 
 }
 
