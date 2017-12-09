@@ -305,11 +305,11 @@ void loop() {
       break;
 
       case ChickenHead:
-        if(RobotTurret.alignToZero() == 0) rState = Triangulate;
+        if(RobotTurret.alignToZero() == 0.0) {rState = Triangulate;}
       break;
 
       case Triangulate:
-
+        exit(0);
       break;
 
       case FlameApproach:
@@ -568,6 +568,6 @@ void updateLCD(GlobalPos *s_GlobalPos, String stateString){
   LCD.print(s_GlobalPos->dYPosition);
 
   LCD.setCursor(0, 1);
-  LCD.print(s_GlobalPos->dAngle); 
+  LCD.print(RobotTurret.getAngle()); 
 }
 
