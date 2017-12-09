@@ -12,6 +12,8 @@
 
 #define STEP_ANGLE 1.8
 
+#define SIXTEENTH_STEP_ANGLE 0.2
+
 #define ERROR_BAND 28 //amount of tolerance on the flame read value
 
 class Turret{
@@ -23,7 +25,7 @@ public:
   // - Tilt Step Pin //wip
   // - Tilt Direction Pin //wip
   
-  Turret(int iFanPin, int iPanStep, int iPanDir);
+  Turret(int iFanPin, int iPanStep, int iPanDir, int ms1, int ms2, int ms3);
   void initTurret();
   void ArmFan();
 
@@ -32,9 +34,9 @@ public:
   void doSweep();
   boolean alignPan(int flameRead);
   
-  int getAngle();
+  double getAngle();
 
-  int alignToZero();
+  double alignToZero();
   
 private:
   Servo sESC;
@@ -42,13 +44,17 @@ private:
   int iFanMotor;
   int iPanStep;
   int iPanDir;
+  int ms1;
+  int ms2;
+  int ms3;
 
   boolean dir; // false is CCW, true is CW
   //will compare this to LEFT or RIGHT
 
-  int iAngle;
+  double iAngle;
 
-  int doStep(boolean dir);
+  double doStep(boolean dir);
+  double doSixteenthStep(boolean dir);
 };
 
 #endif

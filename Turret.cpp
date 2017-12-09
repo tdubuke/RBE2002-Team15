@@ -6,10 +6,13 @@
 /**
  * Constructor
  */
-Turret::Turret(int iFanPin, int iPanStepPin, int iPanDirPin){
+Turret::Turret(int iFanPin, int iPanStepPin, int iPanDirPin, int ims1, int ims2, int ims3){
   iFanMotor = iFanPin;
   iPanStep = iPanStepPin;
   iPanDir = iPanDirPin;
+  ms1 = ims1;
+  ms2 = ims2;
+  ms3 = ims3;
 }
 
 /**
@@ -83,32 +86,36 @@ void Turret::spinFan(){
   sESC.write(150);
 }
 
-int Turret::getAngle(){
+double Turret::getAngle(){
   return iAngle;
 }
 
 //rotate the turret back to coordinate system zero
 //return its current angle
-int Turret::alignToZero(){
+double Turret::alignToZero(){
   if(iAngle == 0){
     return 0;
   }
   else if(iAngle > 0){
-    //if we are on the right side of the sweep, go left
+    //if we are on the left side of the sweep, go right
     doStep(RIGHT);
   }
   else if(iAngle < 0){
-    //if we are on the left side of the sweep, go right
+    //if we are on the right side of the sweep, go left
     doStep(LEFT);
   }
   return iAngle;
 }
 
-//do a step in the given direction, goDirection
+//do a whole step (1.8deg) in the given direction, goDirection
 //update the global angle, iAngle
 //return our resultant angle
-int Turret::doStep(boolean goDirection){
+double Turret::doStep(boolean goDirection){
   dir = goDirection;
+  digitalWrite(ms1, LOW);
+  digitalWrite(ms2, LOW);
+  digitalWrite(ms3, LOW);
+  
   if(goDirection == LEFT){
     digitalWrite(iPanDir,HIGH); //set stepper to left direction
     iAngle += STEP_ANGLE; //update the step angle
@@ -123,4 +130,30 @@ int Turret::doStep(boolean goDirection){
   //return angle
   return iAngle;
 }
+
+//do a sixteenth step (0.2deg) in the given direction, goDirection
+//update the global angle, iAngle
+//return our resultant angle
+double Turret::doSixteenthStep(boolean goDirection){
+  dir = goDirection;
+  digitalWrite(ms1, HIGH);
+  digitalWrite(ms2, HIGH);
+  digitalWrite(ms3, HIGH);
+  
+  if(goDirection == LEFT){
+    digitalWrite(iPanDir,HIGH); //set stepper to left direction
+    iAngle += SIXTEENTH_STEP_ANGLE; //update the step angle
+  }
+  else if (goDirection == RIGHT){
+    digitalWrite(iPanDir, LOW); //set stepper to right direction
+    iAngle -= SIXTEENTH_STEP_ANGLE; //update the step angle
+  }
+  //do one step
+  digitalWrite(iPanStep,HIGH);
+  digitalWrite(iPanStep,LOW);
+  //return angle
+  return iAngle;
+}
+
+
 
