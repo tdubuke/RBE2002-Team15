@@ -26,8 +26,7 @@ struct SensorData{
   int iFrontRange;
   int iRightRange;
   int iLastRightRange;
-  int iRightLine;
-  int iLeftLine;
+  bool bIsCliff;
 };
 
 struct SetData{
@@ -105,7 +104,8 @@ enum STATE{
   WallCorner0,
   WallCorner1,
   WallCorner2,
-  WallCorner3
+  WallCorner3,
+  BackOffCLiff
 };
 
 // beginning state of the robot
@@ -120,6 +120,8 @@ void setup() {
   s_SetData.iSetAngle = 0;
   s_SetData.iSetFrontDist = 3;
   s_SetData.iSetRightDist = 3;
+
+  s_SensorData.bIsCliff = false;
 
   s_GlobalPos.dAngle = 0;
   s_GlobalPos.dAngleOld = 0;
@@ -178,6 +180,8 @@ void loop() {
     updateLightValues(&s_SensorData);
     // update the lcd with the current values
     updateLCD(&s_SensorData, &s_GlobalPos, rState);
+    // update if we see a cliff
+    calcCliff(&s_SensorData);
 
     // set last time through the loop
     iLastTime = iCurTime;
@@ -211,6 +215,13 @@ void loop() {
         // count number of successes on this PID loop
         if(abs(s_SensorData.iFrontRange - s_SetData.iSetFrontDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
+
+        if(s_SensorData.bIsCliff){
+          rState = BackOffCliff;
+          rLastState = FindWall;
+
+          s_SetData.iSetFrontDist = -3;
+        }
 
         // if the number of successes is sufficient, then continue onto next state
         if(iSuccessCounter == iNumValidSuccesses){
@@ -277,16 +288,21 @@ void loop() {
           rLastState = CornerTurning;
           iSuccessCounter = 0;
           DriveTrain.resetPID();
+        }else if(iSuccessCounter == iNumValidSuccesses && rLastState == CliffBackOff){
+          rState = FindWall;
+          rLastState = CornerTurning;
+          iSuccessCounter = 0;
+          DriveTrain.resetPID();
         }
       break;
 
       case AlignHead:
         if(s_SensorData.iLightSensorX < 1023){
-          if(RobotTurret.alignPan(s_SensorData.iLightSensorX)){
-            rState = CornerTurning;
-            rLastState = AlignHead;
+          if(RobotTurret.alignTilt(s_SensorData.iLightSensorY)){
+            //rState = CornerTurning;
+            //rLastState = AlignHead;
 
-            s_SetData.iSetAngle = s_GlobalPos.dAngle - RobotTurret.getAngle();
+            //s_SetData.iSetAngle = s_GlobalPos.dAngle - RobotTurret.getAngle();
           }
         }
       break;
@@ -384,6 +400,24 @@ void loop() {
           DriveTrain.resetPID();
           
           resetEncoderVal(&rEncoder, &lEncoder);
+        }
+      break;
+
+      case BackOffCliff:
+        iThisCurDist = returnDistance(&rEncoder);
+        DriveTrain.DriveToAngleDeadReckoning(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
+         
+        // if the number of successes is sufficient, then continue onto next state
+        if(iThisCurDist == s_SetData.iSetFrontDist && (rLastState == FindWall || rLastState == RightWallFollow)){
+          rState = CornerTurning;
+          s_SetData.iSetAngle = s_GlobalPos.dAngle + 90;
+          
+          rLastState = BackOffCliff;
+          
+          calcDistance(&s_GlobalPos);
+          resetEncoderVal(&rEncoder, &lEncoder);
+
+          DriveTrain.resetPID();
         }
       break;
 
@@ -511,6 +545,14 @@ void updateLightValues(SensorData *s_SensorData){
   s_SensorData->iLightSensorY = Iy[0];
 }
 
+void calcCliff(SensorData *s_SensorData){
+  if(analogRead(iRightLine) > 700 || analogRead(iLeftLine) > 700){
+    s_SensorData.bIsCliff = true;
+  }else{
+    s_SensorData.bIsCliff = false;
+  }
+}
+
 void initLightSensor(){
   slaveAddress = IRsensorAddress >> 1;   // This results in 0x21 as the address to pass to TWI
   // IR sensor initialize
@@ -542,13 +584,13 @@ void calcDistance(GlobalPos *s_GlobalPos){
 void updateLCD(SensorData *s_SensorData, GlobalPos *s_GlobalPos, int stateString){
   LCD.clear();
   LCD.setCursor(0, 0);
-  LCD.print("R:");
+  LCD.print("X:");
   LCD.setCursor(2, 0);
-  LCD.print(s_SensorData->iRightRange);
+  LCD.print(s_SensorData->iLightSensorX);
   LCD.setCursor(8, 0);
-  LCD.print("F:");
+  LCD.print("Y:");
   LCD.setCursor(10, 0);
-  LCD.print(s_SensorData->iFrontRange);
+  LCD.print(s_SensorData->iLightSensorY);
 
   LCD.setCursor(0, 1);
   switch(stateString){
