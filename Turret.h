@@ -3,6 +3,7 @@
 
 #include <Servo.h>
 #include <Arduino.h>
+#include "myStepper.h"
 
 #ifndef TURRET_H
 #define TURRET_H
@@ -25,9 +26,10 @@ public:
   // - Tilt Step Pin //wip
   // - Tilt Direction Pin //wip
   
-  Turret(int iFanPin, int iPanStep, int iPanDir, int ms1, int ms2, int ms3);
+  Turret(int iFanPin, int iPanStep, int iPanDir, int ms1, int ms2, int ms3, int tilt1, int tilt2, int tilt3, int tilt4);
   void initTurret();
   void ArmFan();
+  double doTilt(boolean goDirection);
 
   void spinFan();
 
@@ -41,6 +43,10 @@ public:
 private:
   Servo sESC;
 
+  int tilt1, tilt2, tilt3, tilt4;
+
+  myStepper sTilt;
+  
   int iFanMotor;
   int iPanStep;
   int iPanDir;

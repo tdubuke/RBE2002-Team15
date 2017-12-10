@@ -6,13 +6,17 @@
 /**
  * Constructor
  */
-Turret::Turret(int iFanPin, int iPanStepPin, int iPanDirPin, int ims1, int ims2, int ims3){
+Turret::Turret(int iFanPin, int iPanStepPin, int iPanDirPin, int ims1, int ims2, int ims3, int iTilt1, int iTilt2, int iTilt3, int iTilt4){
   iFanMotor = iFanPin;
   iPanStep = iPanStepPin;
   iPanDir = iPanDirPin;
   ms1 = ims1;
   ms2 = ims2;
   ms3 = ims3;
+  tilt1 = iTilt1;
+  tilt2 = iTilt2;
+  tilt3 = iTilt3;
+  tilt4 = iTilt4;
 }
 
 /**
@@ -28,7 +32,9 @@ void Turret::initTurret(){
 
   ArmFan();
 
-  iAngle = 0; //initialize iAngle to be inline with front of robot
+  iAngle = 90; //initialize iAngle to be inline with left of robot
+
+  sTilt.initStepper(4096, tilt1, tilt2, tilt3, tilt4);
 }
 
 /**
@@ -151,6 +157,12 @@ double Turret::doSixteenthStep(boolean goDirection){
   digitalWrite(iPanStep,LOW);
   //return angle
   return iAngle;
+}
+
+//Using the tilt stepper motor
+//do one step in
+double Turret::doTilt(boolean goDirection){
+  sTilt.step(1);
 }
 
 
