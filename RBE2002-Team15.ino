@@ -8,14 +8,14 @@
 #include <Encoder.h>
 #include <LiquidCrystal.h>
 
-Drive DriveTrain(6, 5);                     // Drive(int iRDrive, int iLDrive)
-L3G gyro;                                   // L3G
-LSM303 accel;                               // LSM303
-SharpIR sFrontSonic(GP2Y0A21YK0F, A0);      // SharpIR(char* model, int Pin)GP2Y0A21YK0F
-Turret RobotTurret(10, 25, 24, 31, 33, 35); // Turret(int iFanPin)
-Encoder rEncoder(3, 51);                    // Robot wheel encoder for odometry
-Encoder lEncoder(2, 50);                    // Robot wheel encoder for odometry
-LiquidCrystal LCD(40,41,42,43,44,45);       // LCD display initialization
+Drive DriveTrain(6, 5);                                     // Drive(int iRDrive, int iLDrive)
+L3G gyro;                                                   // L3G
+LSM303 accel;                                               // LSM303
+SharpIR sFrontSonic(GP2Y0A21YK0F, A0);                      // SharpIR(char* model, int Pin)GP2Y0A21YK0F
+Turret RobotTurret(10, 25, 24, 31, 33, 35, 26, 27, 28, 29); // Turret(int iFanPin)
+Encoder rEncoder(3, 51);                                    // Robot wheel encoder for odometry
+Encoder lEncoder(2, 50);                                    // Robot wheel encoder for odometry
+LiquidCrystal LCD(40,41,42,43,44,45);                       // LCD display initialization
 
 const int iRightLine = 1;                   // saving the analog port of the right line sensor 
 const int iLeftLine = 2;                    // saving the analog port of the left line sensor
@@ -128,9 +128,9 @@ void setup() {
 
   // initialization of the drive train stuff
   DriveTrain.initDrive();
-  DriveTrain.initTurnPID(3, .001, 10);
-  DriveTrain.initRWallPID(5, .001, 5);
-  DriveTrain.initDistPID(7, .0004, 5);
+  DriveTrain.initTurnPID(0.75, 0.002, 5);
+  DriveTrain.initRWallPID(3, 0.001, 5);
+  DriveTrain.initDistPID(7, 0.0004, 5);
 
   LCD.begin(16, 2);
 
@@ -177,7 +177,7 @@ void loop() {
     // update the light sensor data
     updateLightValues(&s_SensorData);
     // update the lcd with the current values
-    updateLCD(&s_GlobalPos, rState);
+    updateLCD(&s_SensorData, &s_GlobalPos, rState);
 
     // set last time through the loop
     iLastTime = iCurTime;
@@ -202,7 +202,6 @@ void loop() {
       break;
 
       case FindWall:
-        RobotTurret.doSweep();
         // sensor fusion of gyro and front range finder and right range finder
         DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, s_SetData.iSetFrontDist, s_SensorData.iFrontRange, 0, 0);
 
@@ -227,7 +226,6 @@ void loop() {
       break;
 
       case RightWallFollow:
-        RobotTurret.doSweep();
         // sensor fusion of gyro and front range finder and right range finder
         DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, 
                                                   s_SetData.iSetFrontDist, s_SensorData.iFrontRange, 
@@ -294,7 +292,9 @@ void loop() {
       break;
 
       case ChickenHead:
-        if(RobotTurret.alignToZero() == 0.0) {rState = Triangulate;}
+        if(RobotTurret.alignToZero() <= 1.8 || RobotTurret.alignToZero() >= -1.8) {
+          rState = Triangulate;
+        }
       break;
 
       case Triangulate:
@@ -310,7 +310,6 @@ void loop() {
       break;
 
       case WallCorner0:
-        RobotTurret.doSweep();
         
         iThisCurDist = returnDistance(&rEncoder);
         DriveTrain.DriveToAngleDeadReckoning(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
@@ -326,11 +325,9 @@ void loop() {
           
           DriveTrain.resetPID();
         }
-        checkFlame(&s_SensorData);
       break;
 
       case WallCorner1:
-        RobotTurret.doSweep();
         
         // turn to angle desired
         DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
@@ -347,11 +344,9 @@ void loop() {
           
           resetEncoderVal(&rEncoder, &lEncoder);
         }
-        checkFlame(&s_SensorData);
       break;
 
       case WallCorner2:
-        RobotTurret.doSweep();
         
         iThisCurDist = returnDistance(&rEncoder);
         DriveTrain.DriveToAngleDeadReckoning(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
@@ -372,11 +367,9 @@ void loop() {
 
           DriveTrain.resetPID();
         }
-        checkFlame(&s_SensorData);
       break;
 
       case WallCorner3:
-        RobotTurret.doSweep();
         // turn to angle desired
         DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
         
@@ -392,7 +385,6 @@ void loop() {
           
           resetEncoderVal(&rEncoder, &lEncoder);
         }
-        checkFlame(&s_SensorData);
       break;
 
       default:
@@ -547,16 +539,16 @@ void calcDistance(GlobalPos *s_GlobalPos){
   s_GlobalPos->dYPosition += dBotTraveled * sin(dAngleRad);
 }
 
-void updateLCD(GlobalPos *s_GlobalPos, int stateString){
+void updateLCD(SensorData *s_SensorData, GlobalPos *s_GlobalPos, int stateString){
   LCD.clear();
   LCD.setCursor(0, 0);
-  LCD.print("X:");
+  LCD.print("R:");
   LCD.setCursor(2, 0);
-  LCD.print(s_GlobalPos->dAngle);
+  LCD.print(s_SensorData->iRightRange);
   LCD.setCursor(8, 0);
-  LCD.print("Y:");
+  LCD.print("F:");
   LCD.setCursor(10, 0);
-  LCD.print(s_GlobalPos->dYPosition);
+  LCD.print(s_SensorData->iFrontRange);
 
   LCD.setCursor(0, 1);
   switch(stateString){
@@ -570,25 +562,25 @@ void updateLCD(GlobalPos *s_GlobalPos, int stateString){
       LCD.print("Right Wall"); 
       break;
     case 3:
-      LCD.print("Wall Edge"); 
-      break;
-    case 4:
       LCD.print("Corner Turning"); 
       break;
-    case 5:
+    case 4:
       LCD.print("Align Head"); 
       break;
-    case 6:
+    case 5:
       LCD.print("Chicken Head"); 
       break;
-    case 7:
+    case 6:
       LCD.print("Triangulate"); 
       break;
-    case 8:
+    case 7:
       LCD.print("Flame Approach"); 
       break;
-    case 9:
+    case 8:
       LCD.print("Extinguish"); 
+      break;
+    case 9:
+      LCD.print("Wall Corner");
       break;
     case 10:
       LCD.print("Wall Corner");
@@ -597,9 +589,6 @@ void updateLCD(GlobalPos *s_GlobalPos, int stateString){
       LCD.print("Wall Corner");
       break;
     case 12:
-      LCD.print("Wall Corner");
-      break;
-    case 13:
       LCD.print("Wall Corner");
       break;
     default:
