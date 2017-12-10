@@ -33,9 +33,14 @@ void Turret::initTurret(){
   ArmFan();
 
   iAngle = 90; //initialize iAngle to be inline with left of robot
+  iTiltAngle = 0; //init tilt angle to be 0 (untilted). Positive is up, Negative is down
 
   sTilt.initStepper(4096, tilt1, tilt2, tilt3, tilt4);
 }
+
+/////////////////////////////////////////////////////////////
+//////////////////// FAN METHODS ////////////////////////////
+/////////////////////////////////////////////////////////////
 
 /**
  * Arming sequence for fan motor
@@ -47,6 +52,14 @@ void Turret::ArmFan(){
   delay(3000);
 }
 
+
+void Turret::spinFan(){
+  sESC.write(150);
+}
+
+/////////////////////////////////////////////////////////////
+//////////////////// PAN STEPPER METHODS  ///////////////////
+/////////////////////////////////////////////////////////////
 
 //direction is kept track of in class
 //when this is called, step once of proper direction
@@ -84,10 +97,6 @@ boolean Turret::alignPan(int flameRead){
   }
   return lockedOn; //false
   
-}
-
-void Turret::spinFan(){
-  sESC.write(150);
 }
 
 double Turret::getAngle(){
@@ -159,10 +168,52 @@ double Turret::doSixteenthStep(boolean goDirection){
   return iAngle;
 }
 
+/////////////////////////////////////////////////////////////
+//////////////////// TILT MOTOR METHODS  ////////////////////
+/////////////////////////////////////////////////////////////
+
 //Using the tilt stepper motor
 //do one step in
 double Turret::doTilt(boolean goDirection){
-  sTilt.step(1);
+  if(goDirection == UP){
+      sTilt.step(1);
+      iTiltAngle+= TILT_ANGLE;
+  }
+  else if(goDirection == DOWN){
+      sTilt.step(-1);
+      iTiltAngle-= TILT_ANGLE;
+  }
+
+}
+
+//Align the tilt motor to have the flame sensor look directly at the flame
+//given the y posn of the flame,
+//tilt up
+//tilt down, or
+//dont tilt
+//and report if we are within an error band
+boolean Turret::alignTilt(int flameRead){
+  //evaluate if the sensor value is within an acceptable band of error
+  boolean lockedOn = (flameRead > (512 - ERROR_BAND) && flameRead < (512 + ERROR_BAND));
+
+  //if locked on, return true and do nothing else
+  if(lockedOn){
+    return lockedOn; //true
+  }
+  //if we're not locked on, figure out which direction to turn
+  else if(flameRead < 512){
+    //meaning the flame is above us
+    doTilt(UP);
+  }
+  else if(flameRead > 512){
+    //the flame is below us
+    doTilt(DOWN);
+  }
+  return lockedOn; //false
+}
+
+double Turret::getTiltAngle(){
+  return iTiltAngle;
 }
 
 

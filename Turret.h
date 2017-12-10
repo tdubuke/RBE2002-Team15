@@ -11,11 +11,16 @@
 #define LEFT true //CCW direction is LOW
 #define RIGHT false //CW direction is HIGH
 
+#define UP true
+#define DOWN false
+
 #define STEP_ANGLE 1.8
 
 #define SIXTEENTH_STEP_ANGLE 0.2
 
 #define ERROR_BAND 28 //amount of tolerance on the flame read value
+
+#define TILT_ANGLE 0.087890625 //degrees per step on the tilt stepper
 
 class Turret{
 public:
@@ -38,7 +43,11 @@ public:
   
   double getAngle();
 
+  double getTiltAngle();
+
   double alignToZero();
+
+  boolean alignTilt(int flameRead);
   
 private:
   Servo sESC;
@@ -57,10 +66,12 @@ private:
   boolean dir; // false is CCW, true is CW
   //will compare this to LEFT or RIGHT
 
-  double iAngle;
+  double iAngle;//angle of PAN stepper
 
   double doStep(boolean dir);
   double doSixteenthStep(boolean dir);
+
+  double iTiltAngle;//angle of TILT stepper
 };
 
 #endif
