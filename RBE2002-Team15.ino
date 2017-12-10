@@ -96,8 +96,6 @@ enum STATE{
   IdleCalibrate,
   FindWall,
   RightWallFollow,
-  WallEdgeTurning,
-  DriveToEncoder,
   CornerTurning,
   AlignHead,
   ChickenHead,
@@ -112,7 +110,7 @@ enum STATE{
 
 // beginning state of the robot
 int rState = IdleCalibrate;
-int rLastState = FindWall;
+int rLastState = IdleCalibrate;
 
 // setup for the robot
 void setup() {
@@ -130,7 +128,7 @@ void setup() {
 
   // initialization of the drive train stuff
   DriveTrain.initDrive();
-  DriveTrain.initTurnPID(2.8, .001, 4);
+  DriveTrain.initTurnPID(3, .001, 10);
   DriveTrain.initRWallPID(5, .001, 5);
   DriveTrain.initDistPID(7, .0004, 5);
 
@@ -141,7 +139,6 @@ void setup() {
 
   initLightSensor();
   Serial.println("Light Init success");
-  updateLCD(&s_GlobalPos, "Light Init");
 
   pinMode(iREchoPin, INPUT);
   pinMode(iRTrigPin, OUTPUT);
@@ -172,15 +169,15 @@ void loop() {
   iCurTime = millis();
 
   // if the time is 100 milliseconds approx then recalcuate the sensor data
-  if((iCurTime - iLastTime) > 50){
+  if((iCurTime - iLastTime) > 100){
     // calculate the angle of the robot
     calcDegree(&s_GlobalPos); 
     // calculate the ranges of the range finders
     calcRange(&s_SensorData);
     // update the light sensor data
     updateLightValues(&s_SensorData);
-
-    updateLCD(&s_GlobalPos, "Looking");
+    // update the lcd with the current values
+    updateLCD(&s_GlobalPos, rState);
 
     // set last time through the loop
     iLastTime = iCurTime;
@@ -197,8 +194,6 @@ void loop() {
 
           // set flag that the robot has been calibrated
           isCalibrated = true;
-
-          updateLCD(&s_GlobalPos, "Ready to go Cap");
         }
         
         if(digitalRead(iInterruptPin) == 0){
@@ -273,13 +268,7 @@ void loop() {
         if(abs(s_SetData.iSetAngle - s_GlobalPos.dAngle) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
-        if(iSuccessCounter == iNumValidSuccesses && rLastState == WallEdgeTurning){
-          rState = WallEdgeTurning;
-          rLastState = CornerTurning;
-          iSuccessCounter = 0;
-          s_SetData.iSetFrontDist = 8;
-          DriveTrain.resetPID();
-        }else if(iSuccessCounter == iNumValidSuccesses && (rLastState == RightWallFollow || rLastState == FindWall)){
+        if(iSuccessCounter == iNumValidSuccesses && (rLastState == RightWallFollow || rLastState == FindWall)){
           rState = RightWallFollow;
           rLastState = CornerTurning;
           iSuccessCounter = 0;
@@ -476,8 +465,8 @@ void calcDegree(GlobalPos *s_GlobalPos){
   accelY /= 256;
   accelZ /= 256;
   
-  s_GlobalPos->dAngle = ((gyroX) - dSubData) * .00955;
-  s_GlobalPos->dAngle = s_GlobalPos->dAngle * .05;
+  s_GlobalPos->dAngle = ((gyroX) - dSubData) * .00875;
+  s_GlobalPos->dAngle = s_GlobalPos->dAngle * .1;
   s_GlobalPos->dAngle += s_GlobalPos->dAngleOld;
   s_GlobalPos->dAngleOld = s_GlobalPos->dAngle;
 
@@ -485,8 +474,10 @@ void calcDegree(GlobalPos *s_GlobalPos){
 
   if(magnitudeofAccel < 6 && magnitudeofAccel > 1.2){
     x_Acc = atan2(accelY,accelZ)*180/ PI;
-    s_GlobalPos->dAngle = s_GlobalPos->dAngle * 0.9 + x_Acc * 0.1;
+    s_GlobalPos->dAngle = s_GlobalPos->dAngle * 0.98 + x_Acc * 0.02;
   }
+
+  s_GlobalPos->dAngle *= -1;
 }
 
 void calcRange(SensorData *s_SensorData){
@@ -556,18 +547,64 @@ void calcDistance(GlobalPos *s_GlobalPos){
   s_GlobalPos->dYPosition += dBotTraveled * sin(dAngleRad);
 }
 
-void updateLCD(GlobalPos *s_GlobalPos, String stateString){
+void updateLCD(GlobalPos *s_GlobalPos, int stateString){
   LCD.clear();
   LCD.setCursor(0, 0);
   LCD.print("X:");
   LCD.setCursor(2, 0);
-  LCD.print(s_GlobalPos->dXPosition);
+  LCD.print(s_GlobalPos->dAngle);
   LCD.setCursor(8, 0);
   LCD.print("Y:");
   LCD.setCursor(10, 0);
   LCD.print(s_GlobalPos->dYPosition);
 
   LCD.setCursor(0, 1);
-  LCD.print(RobotTurret.getAngle()); 
+  switch(stateString){
+    case 0:
+      LCD.print("Idle Calibrate"); 
+      break;
+    case 1:
+      LCD.print("Find Wall"); 
+      break;
+    case 2:
+      LCD.print("Right Wall"); 
+      break;
+    case 3:
+      LCD.print("Wall Edge"); 
+      break;
+    case 4:
+      LCD.print("Corner Turning"); 
+      break;
+    case 5:
+      LCD.print("Align Head"); 
+      break;
+    case 6:
+      LCD.print("Chicken Head"); 
+      break;
+    case 7:
+      LCD.print("Triangulate"); 
+      break;
+    case 8:
+      LCD.print("Flame Approach"); 
+      break;
+    case 9:
+      LCD.print("Extinguish"); 
+      break;
+    case 10:
+      LCD.print("Wall Corner");
+      break;
+    case 11:
+      LCD.print("Wall Corner");
+      break;
+    case 12:
+      LCD.print("Wall Corner");
+      break;
+    case 13:
+      LCD.print("Wall Corner");
+      break;
+    default:
+      LCD.print("Searching Candle");
+      break;
+  }
 }
 

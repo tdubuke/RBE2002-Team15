@@ -47,11 +47,9 @@ void Turret::ArmFan(){
 //also, update global angle
 void Turret::doSweep(){
   if(iAngle >= 45){
-    iAngle = 45;
     dir = RIGHT;
   }
   else if(iAngle <= -45){
-    iAngle = -45;
     dir = LEFT;
   }
   doStep(dir);
