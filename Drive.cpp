@@ -112,13 +112,16 @@ void Drive::DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSet
 /**
  * Dead Reckon drive to angle
  */
-void Drive::DriveToAngleDeadReckoning(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist){
+void Drive::DriveToAngleDeadReckoning(int dir, int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist){
   int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
-  int iMotorSpeed = -30;
+  int iMotorSpeed;
   int iMotorWallOffset = PIDRightWall(iSetRightDist, iCurRightDist);
 
-  if(iMotorOffset > 10) iMotorOffset = 10;
-  else if(iMotorOffset < -10) iMotorOffset = -10;
+  if(dir == 1) iMotorSpeed = -30;
+  else if(dir == 0) iMotorSpeed = 30;
+
+  if(iMotorOffset > 30) iMotorOffset = 30;
+  else if(iMotorOffset < -30) iMotorOffset = -30;
 
   if(iMotorWallOffset > 30) iMotorWallOffset = 30;
   else if(iMotorWallOffset < -30) iMotorWallOffset = -30;
@@ -196,7 +199,7 @@ int Drive::PIDTurn(int iSetAngle, int iCurAngle){
   double iDer = (iError - iTurnLastError)/10;
 
   // total up the sum of the error
-  if(iTurnSumError < 1000 || iError < 0) iTurnSumError += (iError * 10);
+  if(iTurnSumError < 2000 || iError < 0) iTurnSumError += (iError * 10);
 
   // save the last error
   iTurnLastError = iError;

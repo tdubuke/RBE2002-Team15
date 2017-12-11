@@ -105,7 +105,7 @@ enum STATE{
   WallCorner1,
   WallCorner2,
   WallCorner3,
-  BackOffCLiff
+  BackOffCliff
 };
 
 // beginning state of the robot
@@ -118,8 +118,8 @@ void setup() {
   Wire.begin();
 
   s_SetData.iSetAngle = 0;
-  s_SetData.iSetFrontDist = 3;
-  s_SetData.iSetRightDist = 3;
+  s_SetData.iSetFrontDist = 5;
+  s_SetData.iSetRightDist = 5;
 
   s_SensorData.bIsCliff = false;
 
@@ -130,8 +130,8 @@ void setup() {
 
   // initialization of the drive train stuff
   DriveTrain.initDrive();
-  DriveTrain.initTurnPID(0.75, 0.002, 5);
-  DriveTrain.initRWallPID(3, 0.001, 5);
+  DriveTrain.initTurnPID(0.8, 0.002, 7);
+  DriveTrain.initRWallPID(3, 0.001, 8);
   DriveTrain.initDistPID(7, 0.0004, 5);
 
   LCD.begin(16, 2);
@@ -179,7 +179,7 @@ void loop() {
     // update the light sensor data
     updateLightValues(&s_SensorData);
     // update the lcd with the current values
-    updateLCD(&s_SensorData, &s_GlobalPos, rState);
+    updateLCD(&s_SetData, &s_SensorData, &s_GlobalPos, rState);
     // update if we see a cliff
     calcCliff(&s_SensorData);
 
@@ -220,7 +220,8 @@ void loop() {
           rState = BackOffCliff;
           rLastState = FindWall;
 
-          s_SetData.iSetFrontDist = -3;
+          s_SetData.iSetFrontDist = -2;
+          DriveTrain.resetPID();
         }
 
         // if the number of successes is sufficient, then continue onto next state
@@ -228,7 +229,7 @@ void loop() {
           iSuccessCounter = 0;
           rState = CornerTurning;
           rLastState = FindWall;
-          s_SetData.iSetAngle = s_GlobalPos.dAngle + 90;
+          s_SetData.iSetAngle += 90;
 
           DriveTrain.resetPID();
         }
@@ -249,8 +250,15 @@ void loop() {
         if(abs(s_SensorData.iFrontRange - s_SetData.iSetFrontDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
+        if(s_SensorData.bIsCliff){
+          rState = BackOffCliff;
+          rLastState = RightWallFollow;
+
+          s_SetData.iSetFrontDist = -2;
+        }
+
         // check to see if we came to wall edge
-        if(s_SensorData.iRightRange > 10){
+        if(s_SensorData.iRightRange > 20){
           rState = WallCorner0;
           rLastState = RightWallFollow;
           s_SetData.iSetFrontDist = 2;
@@ -263,7 +271,7 @@ void loop() {
           iSuccessCounter = 0;
           rState = CornerTurning;
           rLastState = RightWallFollow;
-          s_SetData.iSetAngle = s_GlobalPos.dAngle + 90;
+          s_SetData.iSetAngle += 90;
 
           DriveTrain.resetPID();
         }
@@ -288,7 +296,7 @@ void loop() {
           rLastState = CornerTurning;
           iSuccessCounter = 0;
           DriveTrain.resetPID();
-        }else if(iSuccessCounter == iNumValidSuccesses && rLastState == CliffBackOff){
+        }else if(iSuccessCounter == iNumValidSuccesses && rLastState == BackOffCliff){
           rState = FindWall;
           rLastState = CornerTurning;
           iSuccessCounter = 0;
@@ -297,12 +305,12 @@ void loop() {
       break;
 
       case AlignHead:
-        if(s_SensorData.iLightSensorX < 1023){
+        if(s_SensorData.iLightSensorY < 1023 && s_SensorData.iLightSensorX < 540 && s_SensorData.iLightSensorX > 480){
           if(RobotTurret.alignTilt(s_SensorData.iLightSensorY)){
-            //rState = CornerTurning;
-            //rLastState = AlignHead;
+            rState = CornerTurning;
+            rLastState = AlignHead;
 
-            //s_SetData.iSetAngle = s_GlobalPos.dAngle - RobotTurret.getAngle();
+            s_SetData.iSetAngle = s_GlobalPos.dAngle + RobotTurret.getAngle();
           }
         }
       break;
@@ -328,7 +336,19 @@ void loop() {
       case WallCorner0:
         
         iThisCurDist = returnDistance(&rEncoder);
-        DriveTrain.DriveToAngleDeadReckoning(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
+        DriveTrain.DriveToAngleDeadReckoning(1, s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
+
+        if(s_SensorData.bIsCliff){
+          rState = BackOffCliff;
+          rLastState = WallCorner0;
+
+          s_SetData.iSetFrontDist = -2;
+
+          calcDistance(&s_GlobalPos);
+          resetEncoderVal(&rEncoder, &lEncoder);
+
+          DriveTrain.resetPID();
+        }
 
         // if the number of successes is sufficient, then continue onto next state
         if(iThisCurDist == s_SetData.iSetFrontDist){
@@ -357,15 +377,25 @@ void loop() {
           iSuccessCounter = 0;
           s_SetData.iSetFrontDist = 7;
           DriveTrain.resetPID();
-          
           resetEncoderVal(&rEncoder, &lEncoder);
         }
       break;
 
       case WallCorner2:
-        
         iThisCurDist = returnDistance(&rEncoder);
-        DriveTrain.DriveToAngleDeadReckoning(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
+        DriveTrain.DriveToAngleDeadReckoning(1, s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
+
+        if(s_SensorData.bIsCliff){
+          rState = BackOffCliff;
+          rLastState = WallCorner2;
+
+          s_SetData.iSetFrontDist = -2;
+
+          calcDistance(&s_GlobalPos);
+          resetEncoderVal(&rEncoder, &lEncoder);
+
+          DriveTrain.resetPID();
+        }
          
         // if the number of successes is sufficient, then continue onto next state
         if(iThisCurDist == s_SetData.iSetFrontDist){
@@ -405,12 +435,13 @@ void loop() {
 
       case BackOffCliff:
         iThisCurDist = returnDistance(&rEncoder);
-        DriveTrain.DriveToAngleDeadReckoning(s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
+        DriveTrain.DriveToAngleDeadReckoning(0, s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
+
          
-        // if the number of successes is sufficient, then continue onto next state
-        if(iThisCurDist == s_SetData.iSetFrontDist && (rLastState == FindWall || rLastState == RightWallFollow)){
+        if(iThisCurDist == s_SetData.iSetFrontDist){
           rState = CornerTurning;
           s_SetData.iSetAngle = s_GlobalPos.dAngle + 90;
+          s_SetData.iSetFrontDist = 4;
           
           rLastState = BackOffCliff;
           
@@ -546,10 +577,10 @@ void updateLightValues(SensorData *s_SensorData){
 }
 
 void calcCliff(SensorData *s_SensorData){
-  if(analogRead(iRightLine) > 700 || analogRead(iLeftLine) > 700){
-    s_SensorData.bIsCliff = true;
+  if(analogRead(iRightLine) > 200 || analogRead(iLeftLine) > 200){
+    s_SensorData->bIsCliff = true;
   }else{
-    s_SensorData.bIsCliff = false;
+    s_SensorData->bIsCliff = false;
   }
 }
 
@@ -581,16 +612,16 @@ void calcDistance(GlobalPos *s_GlobalPos){
   s_GlobalPos->dYPosition += dBotTraveled * sin(dAngleRad);
 }
 
-void updateLCD(SensorData *s_SensorData, GlobalPos *s_GlobalPos, int stateString){
+void updateLCD(SetData *s_SetData, SensorData *s_SensorData, GlobalPos *s_GlobalPos, int stateString){
   LCD.clear();
   LCD.setCursor(0, 0);
   LCD.print("X:");
   LCD.setCursor(2, 0);
-  LCD.print(s_SensorData->iLightSensorX);
+  LCD.print(s_GlobalPos->dAngle);
   LCD.setCursor(8, 0);
   LCD.print("Y:");
   LCD.setCursor(10, 0);
-  LCD.print(s_SensorData->iLightSensorY);
+  LCD.print(s_SetData->iSetAngle);
 
   LCD.setCursor(0, 1);
   switch(stateString){
@@ -632,6 +663,9 @@ void updateLCD(SensorData *s_SensorData, GlobalPos *s_GlobalPos, int stateString
       break;
     case 12:
       LCD.print("Wall Corner");
+      break;
+    case 13:
+      LCD.print("Cliff");
       break;
     default:
       LCD.print("Searching Candle");

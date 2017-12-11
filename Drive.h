@@ -18,7 +18,7 @@ public:
   void initDistPID(double iKP, double iKI, double iKD);
 
   void DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist);
-  void DriveToAngleDeadReckoning(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist);
+  void DriveToAngleDeadReckoning(int dir, int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist);
   
   void TurnTo(int iSetAngle, int iCurAngle);
   int PIDTurn(int iSetAngle, int iCurAngle);
