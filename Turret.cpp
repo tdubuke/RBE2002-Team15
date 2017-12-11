@@ -129,13 +129,13 @@ double Turret::doStep(boolean goDirection){
   digitalWrite(ms2, LOW);
   digitalWrite(ms3, LOW);
   
-  if(goDirection == LEFT){
+  if(goDirection == RIGHT){
     digitalWrite(iPanDir,HIGH); //set stepper to left direction
-    iAngle += STEP_ANGLE; //update the step angle
-  }
-  else if (goDirection == RIGHT){
-    digitalWrite(iPanDir, LOW); //set stepper to right direction
     iAngle -= STEP_ANGLE; //update the step angle
+  }
+  else if (goDirection == LEFT){
+    digitalWrite(iPanDir, LOW); //set stepper to right direction
+    iAngle += STEP_ANGLE; //update the step angle
   }
   //do one step
   digitalWrite(iPanStep,HIGH);

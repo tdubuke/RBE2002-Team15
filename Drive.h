@@ -17,11 +17,11 @@ public:
   void initRWallPID(double iKP, double iKI, double iKD);
   void initDistPID(double iKP, double iKI, double iKD);
 
-  void DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist);
-  void DriveToAngleDeadReckoning(int dir, int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist);
+  void DriveToAngleDistanceFromRWall(double iSetAngle, double iCurAngle, double iSetDist, double iCurDist, double iSetRightDist, double iCurRightDist);
+  void DriveToAngleDeadReckoning(int dir, double iSetAngle, double iCurAngle, double iSetDist, double iCurDist, double iSetRightDist, double iCurRightDist);
   
-  void TurnTo(int iSetAngle, int iCurAngle);
-  int PIDTurn(int iSetAngle, int iCurAngle);
+  void TurnTo(double iSetAngle, double iCurAngle);
+  int PIDTurn(double iSetAngle, double iCurAngle);
 
   void FollowRightWall(int iSetDist, int iCurDist, int iForSpeed);
   int PIDRightWall(int iSetDist, int iCurDist);

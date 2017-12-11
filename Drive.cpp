@@ -74,7 +74,7 @@ void Drive::initDrive(){
  * @param iSetAngle The angle desired
  * @param iCurAngle The current angle of the robot
  */
-void Drive::TurnTo(int iSetAngle, int iCurAngle){
+void Drive::TurnTo(double iSetAngle, double iCurAngle){
   int iMotorOut = PIDTurn(iSetAngle, iCurAngle);
 
   if(iMotorOut > 30) iMotorOut = 30;
@@ -91,16 +91,16 @@ void Drive::TurnTo(int iSetAngle, int iCurAngle){
  * @param iSetDist The distance from the wall that is desired
  * @param iCurDist The distance from the wall that the robot is currently
  */
-void Drive::DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist){
+void Drive::DriveToAngleDistanceFromRWall(double iSetAngle, double iCurAngle, double iSetDist, double iCurDist, double iSetRightDist, double iCurRightDist){
   int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
   int iMotorSpeed = PIDDistance(iSetDist, iCurDist);
   int iMotorWallOffset = PIDRightWall(iSetRightDist, iCurRightDist);
 
-  if(iMotorSpeed > 30) iMotorSpeed = 30;
-  else if(iMotorSpeed < -30) iMotorSpeed = -30;
+  if(iMotorSpeed > 40) iMotorSpeed = 40;
+  else if(iMotorSpeed < -40) iMotorSpeed = -40;
   
-  if(iMotorOffset > 10) iMotorOffset = 10;
-  else if(iMotorOffset < -10) iMotorOffset = -10;
+  if(iMotorOffset > 30) iMotorOffset = 30;
+  else if(iMotorOffset < -30) iMotorOffset = -30;
 
   if(iMotorWallOffset > 30) iMotorWallOffset = 30;
   else if(iMotorWallOffset < -30) iMotorWallOffset = -30;
@@ -112,7 +112,7 @@ void Drive::DriveToAngleDistanceFromRWall(int iSetAngle, int iCurAngle, int iSet
 /**
  * Dead Reckon drive to angle
  */
-void Drive::DriveToAngleDeadReckoning(int dir, int iSetAngle, int iCurAngle, int iSetDist, int iCurDist, int iSetRightDist, int iCurRightDist){
+void Drive::DriveToAngleDeadReckoning(int dir, double iSetAngle, double iCurAngle, double iSetDist, double iCurDist, double iSetRightDist, double iCurRightDist){
   int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
   int iMotorSpeed;
   int iMotorWallOffset = PIDRightWall(iSetRightDist, iCurRightDist);
@@ -191,7 +191,7 @@ int Drive::PIDRightWall(int iSetDist, int iCurDist){
  * @param iCurAngle The angle the robot is currently facing
  * @return The motor speed to turn
  */
-int Drive::PIDTurn(int iSetAngle, int iCurAngle){
+int Drive::PIDTurn(double iSetAngle, double iCurAngle){
   // calculate the error
   double iError = iSetAngle - iCurAngle;
 

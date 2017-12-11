@@ -19,7 +19,7 @@ void resetEncoderVal(Encoder *eREncoder, Encoder *eLEncoder){
 double returnDistance(Encoder *eEncoder){
   double ticks = eEncoder->read();
 
-  double distance = (ticks/9600.0) * 8.63937979;
+  double distance = (ticks/3200.0) * 8.63937979;
 
   return distance;
 }

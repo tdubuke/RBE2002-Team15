@@ -11,7 +11,7 @@
 Drive DriveTrain(6, 5);                                     // Drive(int iRDrive, int iLDrive)
 L3G gyro;                                                   // L3G
 LSM303 accel;                                               // LSM303
-SharpIR sFrontSonic(GP2Y0A21YK0F, A0);                      // SharpIR(char* model, int Pin)GP2Y0A21YK0F
+SharpIR sFrontSonic(GP2YA41SK0F, A0);                      // SharpIR(char* model, int Pin)GP2Y0A21YK0F GP2Y0A21YK? GP2YA41SK0F
 Turret RobotTurret(10, 25, 24, 31, 33, 35, 26, 27, 28, 29); // Turret(int iFanPin)
 Encoder rEncoder(3, 51);                                    // Robot wheel encoder for odometry
 Encoder lEncoder(2, 50);                                    // Robot wheel encoder for odometry
@@ -23,8 +23,8 @@ const int iLeftLine = 2;                    // saving the analog port of the lef
 struct SensorData{
   int iLightSensorX;
   int iLightSensorY;
-  int iFrontRange;
-  int iRightRange;
+  double iFrontRange;
+  double iRightRange;
   int iLastRightRange;
   bool bIsCliff;
 };
@@ -119,7 +119,7 @@ void setup() {
 
   s_SetData.iSetAngle = 0;
   s_SetData.iSetFrontDist = 5;
-  s_SetData.iSetRightDist = 5;
+  s_SetData.iSetRightDist = 4;
 
   s_SensorData.bIsCliff = false;
 
@@ -130,8 +130,8 @@ void setup() {
 
   // initialization of the drive train stuff
   DriveTrain.initDrive();
-  DriveTrain.initTurnPID(0.8, 0.002, 7);
-  DriveTrain.initRWallPID(3, 0.001, 8);
+  DriveTrain.initTurnPID(0.8, 0.003, 7);
+  DriveTrain.initRWallPID(1, 0.005, 3);
   DriveTrain.initDistPID(7, 0.0004, 5);
 
   LCD.begin(16, 2);
@@ -160,7 +160,7 @@ void setup() {
 }
 
 void checkFlame(SensorData *s_SensorData){
-  if(s_SensorData->iLightSensorX < 1023 || s_SensorData->iLightSensorY < 1023){
+  if(s_SensorData->iLightSensorY < 1023 && s_SensorData->iLightSensorX < 540 && s_SensorData->iLightSensorX > 480){
     rState = AlignHead;
     DriveTrain.StopMotors();
   }
@@ -202,6 +202,7 @@ void loop() {
         
         if(digitalRead(iInterruptPin) == 0){
           rState = FindWall;
+          rLastState = IdleCalibrate;
         }
       break;
 
@@ -220,7 +221,14 @@ void loop() {
           rState = BackOffCliff;
           rLastState = FindWall;
 
-          s_SetData.iSetFrontDist = -2;
+          s_SetData.iSetFrontDist = -5;
+          DriveTrain.resetPID();
+        }
+
+        if(s_SensorData.iRightRange < 10){
+          rState = RightWallFollow;
+          rLastState = FindWall;
+
           DriveTrain.resetPID();
         }
 
@@ -229,6 +237,7 @@ void loop() {
           iSuccessCounter = 0;
           rState = CornerTurning;
           rLastState = FindWall;
+          
           s_SetData.iSetAngle += 90;
 
           DriveTrain.resetPID();
@@ -254,14 +263,14 @@ void loop() {
           rState = BackOffCliff;
           rLastState = RightWallFollow;
 
-          s_SetData.iSetFrontDist = -2;
+          s_SetData.iSetFrontDist = -5;
         }
 
         // check to see if we came to wall edge
         if(s_SensorData.iRightRange > 20){
           rState = WallCorner0;
           rLastState = RightWallFollow;
-          s_SetData.iSetFrontDist = 2;
+          s_SetData.iSetFrontDist = 5;
         }else{
           s_SensorData.iLastRightRange = s_SensorData.iRightRange;
         }
@@ -282,7 +291,7 @@ void loop() {
         // turn to angle desired
         DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
         
-        if(abs(s_SetData.iSetAngle - s_GlobalPos.dAngle) < 2) iSuccessCounter++;
+        if(abs(s_SetData.iSetAngle - s_GlobalPos.dAngle) < 8) iSuccessCounter++;
         else iSuccessCounter = 0;
 
         if(iSuccessCounter == iNumValidSuccesses && (rLastState == RightWallFollow || rLastState == FindWall)){
@@ -305,24 +314,25 @@ void loop() {
       break;
 
       case AlignHead:
-        if(s_SensorData.iLightSensorY < 1023 && s_SensorData.iLightSensorX < 540 && s_SensorData.iLightSensorX > 480){
-          if(RobotTurret.alignTilt(s_SensorData.iLightSensorY)){
-            rState = CornerTurning;
-            rLastState = AlignHead;
+        // make sure we still have the flame
+        if(RobotTurret.alignTilt(s_SensorData.iLightSensorY)){
+          rState = CornerTurning;
+          rLastState = AlignHead;
 
-            s_SetData.iSetAngle = s_GlobalPos.dAngle + RobotTurret.getAngle();
-          }
+          s_SetData.iSetAngle = s_GlobalPos.dAngle + RobotTurret.getAngle();
         }
+        
       break;
 
       case ChickenHead:
-        if(RobotTurret.alignToZero() <= 1.8 || RobotTurret.alignToZero() >= -1.8) {
+        if(RobotTurret.alignToZero() <= 1.8 && RobotTurret.alignToZero() >= -1.8) {
           rState = Triangulate;
+          rLastState = ChickenHead;
         }
       break;
 
       case Triangulate:
-        exit(0);
+        RobotTurret.spinFan();
       break;
 
       case FlameApproach:
@@ -342,7 +352,7 @@ void loop() {
           rState = BackOffCliff;
           rLastState = WallCorner0;
 
-          s_SetData.iSetFrontDist = -2;
+          s_SetData.iSetFrontDist = -5;
 
           calcDistance(&s_GlobalPos);
           resetEncoderVal(&rEncoder, &lEncoder);
@@ -354,7 +364,7 @@ void loop() {
         if(iThisCurDist == s_SetData.iSetFrontDist){
           rState = WallCorner1;
           rLastState = WallCorner0;
-          s_SetData.iSetAngle = s_GlobalPos.dAngle - 90;
+          s_SetData.iSetAngle -= 90;
 
           calcDistance(&s_GlobalPos);
           resetEncoderVal(&rEncoder, &lEncoder);
@@ -368,14 +378,14 @@ void loop() {
         // turn to angle desired
         DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
         
-        if(abs(s_SetData.iSetAngle - s_GlobalPos.dAngle) < 2) iSuccessCounter++;
+        if(abs(s_SetData.iSetAngle - s_GlobalPos.dAngle) < 8) iSuccessCounter++;
         else iSuccessCounter = 0;
 
         if(iSuccessCounter == iNumValidSuccesses){
           rState = WallCorner2;
           rLastState = WallCorner1;
           iSuccessCounter = 0;
-          s_SetData.iSetFrontDist = 7;
+          s_SetData.iSetFrontDist = 16;
           DriveTrain.resetPID();
           resetEncoderVal(&rEncoder, &lEncoder);
         }
@@ -389,10 +399,19 @@ void loop() {
           rState = BackOffCliff;
           rLastState = WallCorner2;
 
-          s_SetData.iSetFrontDist = -2;
+          s_SetData.iSetFrontDist = -5;
 
           calcDistance(&s_GlobalPos);
           resetEncoderVal(&rEncoder, &lEncoder);
+
+          DriveTrain.resetPID();
+        }
+
+        if(s_SensorData.iFrontRange <= 5){
+          rState = CornerTurning;
+          rLastState = WallCorner2;
+
+          s_SetData.iSetAngle += 90;
 
           DriveTrain.resetPID();
         }
@@ -401,9 +420,11 @@ void loop() {
         if(iThisCurDist == s_SetData.iSetFrontDist){
           if(s_SensorData.iRightRange > 20){
             rState = WallCorner3;
-            s_SetData.iSetAngle = s_GlobalPos.dAngle - 90;
+            rLastState = WallCorner2;
+            s_SetData.iSetAngle -= 90;
           }else{
             rState = RightWallFollow;
+            rLastState = WallCorner2;
           }
           
           rLastState = WallCorner2;
@@ -426,7 +447,7 @@ void loop() {
           rState = FindWall;
           rLastState = WallCorner3;
           iSuccessCounter = 0;
-          s_SetData.iSetFrontDist = 5;
+          s_SetData.iSetFrontDist = 7;
           DriveTrain.resetPID();
           
           resetEncoderVal(&rEncoder, &lEncoder);
@@ -437,13 +458,21 @@ void loop() {
         iThisCurDist = returnDistance(&rEncoder);
         DriveTrain.DriveToAngleDeadReckoning(0, s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
 
+        if(s_SensorData.iFrontRange <= 5){
+          rState = CornerTurning;
+          rLastState = WallCorner2;
+
+          s_SetData.iSetAngle += 90;
+
+          DriveTrain.resetPID();
+        }
          
         if(iThisCurDist == s_SetData.iSetFrontDist){
           rState = CornerTurning;
-          s_SetData.iSetAngle = s_GlobalPos.dAngle + 90;
-          s_SetData.iSetFrontDist = 4;
-          
           rLastState = BackOffCliff;
+          
+          s_SetData.iSetAngle += 90;
+          s_SetData.iSetFrontDist = 4;
           
           calcDistance(&s_GlobalPos);
           resetEncoderVal(&rEncoder, &lEncoder);
@@ -538,7 +567,7 @@ void calcDegree(GlobalPos *s_GlobalPos){
 }
 
 void calcRange(SensorData *s_SensorData){
-  s_SensorData->iFrontRange = (sFrontSonic.getDistance()) / 2.54;
+  s_SensorData->iFrontRange = (sFrontSonic.getDistance());
 
   digitalWrite(iRTrigPin, LOW);
   delayMicroseconds(2);
@@ -547,7 +576,7 @@ void calcRange(SensorData *s_SensorData){
   digitalWrite(iRTrigPin, LOW);
 
   int duration = pulseIn(iREchoPin, HIGH);
-  s_SensorData->iRightRange = (duration/74/2);
+  s_SensorData->iRightRange = (duration/74.0/2.0);
 }
 
 void updateLightValues(SensorData *s_SensorData){
@@ -577,7 +606,8 @@ void updateLightValues(SensorData *s_SensorData){
 }
 
 void calcCliff(SensorData *s_SensorData){
-  if(analogRead(iRightLine) > 200 || analogRead(iLeftLine) > 200){
+  Serial.println(analogRead(iRightLine));
+  if(analogRead(iRightLine) > 400 || analogRead(iLeftLine) > 400){
     s_SensorData->bIsCliff = true;
   }else{
     s_SensorData->bIsCliff = false;
@@ -617,11 +647,11 @@ void updateLCD(SetData *s_SetData, SensorData *s_SensorData, GlobalPos *s_Global
   LCD.setCursor(0, 0);
   LCD.print("X:");
   LCD.setCursor(2, 0);
-  LCD.print(s_GlobalPos->dAngle);
+  LCD.print(s_GlobalPos->dXPosition);
   LCD.setCursor(8, 0);
   LCD.print("Y:");
   LCD.setCursor(10, 0);
-  LCD.print(s_SetData->iSetAngle);
+  LCD.print(s_GlobalPos->dYPosition);
 
   LCD.setCursor(0, 1);
   switch(stateString){
