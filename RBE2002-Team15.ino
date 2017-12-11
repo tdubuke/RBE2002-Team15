@@ -40,10 +40,14 @@ struct GlobalPos{
   double dAngleOld;
   double dXPosition;
   double dYPosition;
+  double dZPosition;
 };
 
 SensorData s_SensorData;
-GlobalPos s_GlobalPos;
+GlobalPos s_GlobalPos; //globalposition for current posn of bot
+GlobalPos s_FirstSighting; //position of robot at first flame sighting
+GlobalPos s_SecondSighting; //position of robot at second flame sighting
+GlobalPos s_FlamePosition; //position of FLAME in our coordinate system
 SetData s_SetData;
 
 // for IR Sensor
@@ -702,4 +706,124 @@ void updateLCD(SetData *s_SetData, SensorData *s_SensorData, GlobalPos *s_Global
       break;
   }
 }
+
+
+//Calculates the position of the flame by spotting flame, 
+//Taking a corner,
+//then spotting flame again
+//consumes first position, s_FirstSighting
+//second position, s_SecondSighting
+//and the Y value from IR Camera at second sighting
+//mutates position of the flame, write out to s_FlamePosition
+void flameCalcCorner(GlobalPos* firstSight, GlobalPos* secondSight, double tiltAngle, GlobalPos* flamePosn){
+  
+  double firstAngle = (int)(firstSight->dAngle) % 360;
+  double firstX = firstSight->dXPosition;
+  double firstY = firstSight->dYPosition;
+  
+  double secondAngle = (int)(secondSight->dAngle) % 360;
+  double secondX = secondSight->dXPosition;
+  double secondY = secondSight->dYPosition;
+
+  double xFlame = 0;
+  double yFlame = 0;
+  double zFlame = 0;
+  
+  //according to the global coordinate system
+  // 0deg   = NORTH  ^
+  // 180deg = SOUTH  v
+  // 270deg = EAST   <
+  // 90deg  = WEST   >
+
+  //approximate angles to nearest 90 deg
+  firstAngle = approxAngle(firstAngle);
+  secondAngle = approxAngle(secondAngle);
+
+  //checking to see if something horrible has happened
+  if((firstAngle == -1) || (secondAngle == -1)){
+    //if we get unexpected garbage, send the robot looking again
+    rState = FindWall;
+  }
+  // NORTH -> WEST
+  else if(firstAngle == 0 && secondAngle == 90){
+    xFlame = secondX;
+    yFlame = firstY;
+  }
+  // WEST -> SOUTH
+  else if(firstAngle == 90 && secondAngle == 180){
+    xFlame = firstX;
+    yFlame = secondY;
+  }  
+  // SOUTH -> EAST
+  else if(firstAngle == 180 && secondAngle == 270){
+    xFlame = secondX;
+    yFlame = firstY;
+  }  
+  // EAST -> NORTH
+  else if(firstAngle == 270 && secondAngle == 0){
+    xFlame = firstX;
+    yFlame = secondY;
+  }    
+
+  //calculate the height of the flame using trig
+  zFlame = getFlameHeight( xFlame,  yFlame,  secondX,  secondY, tiltAngle);
+
+  //set the values to the position object
+  flamePosn->dXPosition = xFlame;
+  flamePosn->dYPosition = yFlame;
+  flamePosn->dZPosition = zFlame;
+  
+}
+
+//consumes input angle
+//produces output angle approximated to the nearest 90degree
+double approxAngle(double inputAngle){
+  if( ((inputAngle >=315) && (inputAngle <= 360)) || ((inputAngle >= 0) && (inputAngle <=44))){
+    return 0;
+  }
+  else if((inputAngle >= 45) && (inputAngle <= 134)){
+    return 90;
+  }
+  else if((inputAngle >= 135) && (inputAngle <= 224)){
+    return 180;
+  }
+  
+  else if((inputAngle >= 225) && (inputAngle <= 315)){
+    return 270;
+  }
+  else{ //something horrible has happened
+    return -1;
+  }
+
+  
+}
+
+//consumes (X,Y) of flame,
+// (X,Y) of second sighting of robot,
+// and the angle read from the tilt stepper for the IR Camera to center on flame
+double getFlameHeight(double xFlame, double yFlame, double xBot, double yBot, double tiltAngle){
+
+  //we just want the magnitude of the difference;
+  //the acutal direction of this does not matter, since we already know posn
+  double deltaX = abs(abs(xFlame) - abs(xBot));
+  double deltaY = abs(abs(yFlame) - abs(yBot));
+
+  double d = 0; //initialize distance to flame
+  double camHeight = 7.75; //height of the IR Camera from the floor
+
+  if(deltaX == 0){
+    d = deltaY;
+  }
+  else if(deltaY == 0){
+    d = deltaX;
+  }
+
+  return camHeight + d * tan(tiltAngle);    
+}
+
+
+
+
+
+
 
