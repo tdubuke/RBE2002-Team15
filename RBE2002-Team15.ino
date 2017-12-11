@@ -389,7 +389,7 @@ void loop() {
           rState = WallCorner2;
           rLastState = WallCorner1;
           iSuccessCounter = 0;
-          s_SetData.iSetFrontDist = 16;
+          s_SetData.iSetFrontDist = 19;
           DriveTrain.resetPID();
           resetEncoderVal(&rEncoder, &lEncoder);
         }
