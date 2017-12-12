@@ -96,8 +96,8 @@ void Drive::DriveToAngleDistanceFromRWall(double iSetAngle, double iCurAngle, do
   int iMotorSpeed = PIDDistance(iSetDist, iCurDist);
   int iMotorWallOffset = PIDRightWall(iSetRightDist, iCurRightDist);
 
-  if(iMotorSpeed > 40) iMotorSpeed = 40;
-  else if(iMotorSpeed < -40) iMotorSpeed = -40;
+  if(iMotorSpeed > 30) iMotorSpeed = 30;
+  else if(iMotorSpeed < -30) iMotorSpeed = -30;
   
   if(iMotorOffset > 30) iMotorOffset = 30;
   else if(iMotorOffset < -30) iMotorOffset = -30;

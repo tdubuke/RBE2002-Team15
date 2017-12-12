@@ -30,6 +30,10 @@ void Turret::initTurret(){
   //set pan direction pin to output
   pinMode(iPanDir, OUTPUT);
 
+  pinMode(ms1, OUTPUT);
+  pinMode(ms2, OUTPUT);
+  pinMode(ms3, OUTPUT);
+
   ArmFan();
 
   iAngle = 90; //initialize iAngle to be inline with left of robot
@@ -89,11 +93,11 @@ boolean Turret::alignPan(int flameRead){
   //if we're not locked on, figure out which direction to turn
   else if(flameRead < 512){
     //meaning the flame is to the left of us
-    doStep(LEFT);
+    doStep(RIGHT);
   }
   else if(flameRead > 512){
     //the flame is to the right of us
-    doStep(RIGHT);
+    doStep(LEFT);
   }
   return lockedOn; //false
   
