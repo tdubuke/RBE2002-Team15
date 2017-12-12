@@ -37,6 +37,7 @@ public:
   double doTilt(boolean goDirection);
 
   void spinFan();
+  void stopFan();
 
   void doSweep();
   boolean alignPan(int flameRead);

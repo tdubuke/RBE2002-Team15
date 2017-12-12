@@ -352,35 +352,42 @@ void loop() {
       case AlignHead:
         // make sure we still have the flame
         if(RobotTurret.alignTilt(s_SensorData.iLightSensorY) && RobotTurret.alignPan(s_SensorData.iLightSensorX)){
-          rState = ChickenHead; //CornerTurning;
+          rState = Triangulate; //CornerTurning;
           rLastState = AlignHead;
 
           //s_SetData.iSetAngle = s_GlobalPos.dAngle + RobotTurret.getAngle();
         }else if(s_SensorData.iLightSensorY == 1023){
-          rState = ChickenHead; //CornerTurning;
+          rState = Triangulate; //CornerTurning;
           rLastState = AlignHead;
         }
         
       break;
 
       case ChickenHead:
-          flameCalcCorner(&s_FirstSighting, &s_SecondSighting, RobotTurret.getTiltAngle(), &s_FlamePosition);
-          rState = Triangulate;
-          rLastState = ChickenHead;
+          
       break;
 
       case Triangulate:
-        RobotTurret.spinFan();
-        delay(3000);
-        rState = FlameApproach;
+        flameCalcCorner(&s_FirstSighting, &s_SecondSighting, RobotTurret.getTiltAngle(), &s_FlamePosition);
+        if((abs(s_FlamePosition.dXPosition) - abs(s_GlobalPos.dXPosition)) > 36 || (abs(s_FlamePosition.dYPosition) - abs(s_GlobalPos.dYPosition)) > 36){
+          rState = FlameApproach;
+        }else{
+          rState = Extinguish;
+        }
+        rLastState = ChickenHead;
       break;
 
       case FlameApproach:
-
+        
       break;
 
       case Extinguish:
-
+        if(s_SensorData.iLightSensorX < 1023 && s_SensorData.iLightSensorY < 1023){
+          RobotTurret.spinFan();
+        }else{
+          RobotTurret.stopFan();
+          rState = FlameApproach;
+        }
       break;
 
       case WallCorner0:
@@ -822,7 +829,7 @@ double getFlameHeight(double xFlame, double yFlame, double xBot, double yBot, do
   Serial.print("Distance To Flame: ");
   Serial.println(d);
 
-  return camHeight + d * tan(tiltAngle);    
+  return camHeight + d * tan(tiltAngle * 0.0174533);    
 }
 
 //used to adjust xposn and yposn
@@ -850,12 +857,12 @@ void updateLCD(SetData *s_SetData, SensorData *s_SensorData, GlobalPos *s_Global
 
   LCD.setCursor(0, 1);
 
-  if(rState == AlignHead || rState == Triangulate || rState == FlameApproach){
+  if(s_tFlamePosition->valid){
     LCD.print(s_tFlamePosition->dXPosition);
     LCD.setCursor(5, 1);
-    LCD.print(s_tFlamePosition->dXPosition);
+    LCD.print(s_tFlamePosition->dYPosition);
     LCD.setCursor(10, 1);
-    LCD.print(s_tFlamePosition->dXPosition);
+    LCD.print(s_tFlamePosition->dZPosition);
   }else{
     switch(stateString){
       case 0:
