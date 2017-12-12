@@ -72,6 +72,10 @@ private:
   double doSixteenthStep(boolean dir);
 
   double iTiltAngle;//angle of TILT stepper
+
+  double distToFlame; //distance to Flame, for use later
+
+  double adjustedAngle; //angle to set stepper to compensate for camera and fan at different height
 };
 
 #endif

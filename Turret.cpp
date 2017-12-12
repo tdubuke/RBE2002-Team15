@@ -61,6 +61,10 @@ void Turret::spinFan(){
   sESC.write(150);
 }
 
+void Turret::stopFan(){
+  sESC.write(45);
+}
+
 /////////////////////////////////////////////////////////////
 //////////////////// PAN STEPPER METHODS  ///////////////////
 /////////////////////////////////////////////////////////////
@@ -218,6 +222,34 @@ boolean Turret::alignTilt(int flameRead){
 
 double Turret::getTiltAngle(){
   return iTiltAngle;
+}
+
+//moves the tilt stepper to a given angle
+//returns true once reached
+boolean Turret::tiltToAngle(double inputAngle){
+  if(iTiltAngle == inputAngle){
+    return true;
+  }
+  else if(iTiltAngle > inputAngle){
+    doTilt(DOWN);
+  }
+  else if(iTiltAngle < inputAngle){
+    doTilt(UP);
+  }
+  return false;
+}
+
+//calculates how much the turret should tilt up or down
+//to compensate for the IR Camera not being in same plane as FAN
+//tiltAngle is angle at end of triangulation
+void Turret::calcTiltAdjust(double flameHeight){
+  double fanAngle = atan(((flameHeight + 1.25)/distToFlame) * ((2 * 3.141592654)/360));
+  adjustedAngle =  fanAngle - iTiltAngle; //set! the angle to adjust to
+}
+
+//return the adjusted angle
+double getAdjustedAngle(){
+  return adjustedAngle;
 }
 
 
