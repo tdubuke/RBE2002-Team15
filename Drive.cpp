@@ -92,6 +92,10 @@ void Drive::TurnTo(double iSetAngle, double iCurAngle){
  * @param iCurDist The distance from the wall that the robot is currently
  */
 void Drive::DriveToAngleDistanceFromRWall(double iSetAngle, double iCurAngle, double iSetDist, double iCurDist, double iSetRightDist, double iCurRightDist){
+
+  //if(iCurRightDist < iSetRightDist) iSetAngle += 5 * (iSetRightDist - iCurRightDist);
+  //else if(iCurRightDist > iSetRightDist) iSetAngle -= 5 * (iCurRightDist - iSetRightDist);
+  
   int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
   int iMotorSpeed = PIDDistance(iSetDist, iCurDist);
   int iMotorWallOffset = PIDRightWall(iSetRightDist, iCurRightDist);

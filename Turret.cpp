@@ -82,6 +82,15 @@ void Turret::doSweep(){
   doStep(dir);
 }
 
+void Turret::doUpDown(){
+  if(iTiltAngle >= 5){
+    tiltDir = DOWN;
+  }else if(iTiltAngle <= -5){
+    tiltDir = UP;
+  }
+  doTilt(tiltDir);
+}
+
 //On every call,
 //Step the turret towards flameRead = 512
 //where the turret aligns with front of robot
@@ -97,11 +106,11 @@ boolean Turret::alignPan(int flameRead){
   //if we're not locked on, figure out which direction to turn
   else if(flameRead < 512){
     //meaning the flame is to the left of us
-    doStep(RIGHT);
+    doSixteenthStep(RIGHT);
   }
   else if(flameRead > 512){
     //the flame is to the right of us
-    doStep(LEFT);
+    doSixteenthStep(LEFT);
   }
   return lockedOn; //false
   
@@ -162,11 +171,11 @@ double Turret::doSixteenthStep(boolean goDirection){
   digitalWrite(ms3, HIGH);
   
   if(goDirection == LEFT){
-    digitalWrite(iPanDir,HIGH); //set stepper to left direction
+    digitalWrite(iPanDir,LOW); //set stepper to left direction
     iAngle += SIXTEENTH_STEP_ANGLE; //update the step angle
   }
   else if (goDirection == RIGHT){
-    digitalWrite(iPanDir, LOW); //set stepper to right direction
+    digitalWrite(iPanDir, HIGH); //set stepper to right direction
     iAngle -= SIXTEENTH_STEP_ANGLE; //update the step angle
   }
   //do one step
@@ -227,7 +236,7 @@ double Turret::getTiltAngle(){
 //moves the tilt stepper to a given angle
 //returns true once reached
 boolean Turret::tiltToAngle(double inputAngle){
-  if(iTiltAngle == inputAngle){
+  if(iTiltAngle > (inputAngle - 1) && iTiltAngle < (inputAngle + 1)){
     return true;
   }
   else if(iTiltAngle > inputAngle){
@@ -248,7 +257,7 @@ void Turret::calcTiltAdjust(double flameHeight){
 }
 
 //return the adjusted angle
-double getAdjustedAngle(){
+double Turret::getAdjustedAngle(){
   return adjustedAngle;
 }
 

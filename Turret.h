@@ -49,6 +49,14 @@ public:
   double alignToZero();
 
   boolean alignTilt(int flameRead);
+
+  double getAdjustedAngle();
+
+  void calcTiltAdjust(double flameHeight);
+
+  boolean tiltToAngle(double inputAngle);
+
+  void doUpDown();
   
 private:
   Servo sESC;
@@ -66,6 +74,8 @@ private:
 
   boolean dir; // false is CCW, true is CW
   //will compare this to LEFT or RIGHT
+
+  boolean tiltDir;
 
   double iAngle;//angle of PAN stepper
 
