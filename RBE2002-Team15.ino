@@ -12,7 +12,7 @@ Drive DriveTrain(6, 5);                                     // Drive(int iRDrive
 L3G gyro;                                                   // L3G
 LSM303 accel;                                               // LSM303
 SharpIR sFrontSonic(GP2YA41SK0F, A0);                      // SharpIR(char* model, int Pin)GP2Y0A21YK0F GP2Y0A21YK? GP2YA41SK0F
-Turret RobotTurret(10, 25, 24, 31, 33, 35, 26, 27, 28, 29); // Turret(int iFanPin)
+Turret RobotTurret(10, 25, 24, 31, 33, 35, 26, 28, 27, 29); // Turret(int iFanPin)
 Encoder rEncoder(3, 51);                                    // Robot wheel encoder for odometry
 Encoder lEncoder(2, 50);                                    // Robot wheel encoder for odometry
 LiquidCrystal LCD(40,41,42,43,44,45);                       // LCD display initialization
@@ -376,7 +376,8 @@ void loop() {
 
       case AlignHead:
         // make sure we still have the flame
-        if(RobotTurret.alignTilt(s_SensorData.iLightSensorY) && RobotTurret.alignPan(s_SensorData.iLightSensorX)){
+        if(RobotTurret.alignTilt(s_SensorData.iLightSensorY) && RobotTurret.alignPan(s_SensorData.iLightSensorX) 
+                                  && s_SensorData.iLightSensorX != 1023 && s_SensorData.iLightSensorY != 1023){
           rState = Triangulate; //CornerTurning;
           rLastState = AlignHead;
 
@@ -895,7 +896,9 @@ void updateLCD(SetData *s_SetData, SensorData *s_SensorData, GlobalPos *s_Global
 
   LCD.setCursor(0, 1);
 
-  if(s_tFlamePosition->valid){
+  if(rState == Extinguish){
+    LCD.print("Extinguishing");
+  }else if(s_tFlamePosition->valid){
     LCD.print(s_tFlamePosition->dXPosition);
     LCD.setCursor(5, 1);
     LCD.print(s_tFlamePosition->dYPosition);
@@ -903,6 +906,8 @@ void updateLCD(SetData *s_SetData, SensorData *s_SensorData, GlobalPos *s_Global
     LCD.print(s_tFlamePosition->dZPosition);
   }else if(firstSightingFlag){
     LCD.print("FIRST SIGHTING");
+  }else if(isCalibrated && rState == IdleCalibrate){
+    LCD.print("Ready To Go Cap");
   }else{
     switch(stateString){
       case 0:
@@ -930,10 +935,10 @@ void updateLCD(SetData *s_SetData, SensorData *s_SensorData, GlobalPos *s_Global
         LCD.print("Flame Approach"); 
         break;
       case 8:
-        LCD.print("Extinguish"); 
+        LCD.print("Flame Approach"); 
         break;
       case 9:
-        LCD.print("Wall Corner");
+        LCD.print("Extinguish"); 
         break;
       case 10:
         LCD.print("Wall Corner");
@@ -945,6 +950,9 @@ void updateLCD(SetData *s_SetData, SensorData *s_SensorData, GlobalPos *s_Global
         LCD.print("Wall Corner");
         break;
       case 13:
+        LCD.print("Wall Corner");
+        break;
+      case 14:
         LCD.print("Cliff");
         break;
       default:

@@ -200,7 +200,6 @@ double Turret::doTilt(boolean goDirection){
       sTilt.step(-1);
       iTiltAngle-= TILT_ANGLE;
   }
-
 }
 
 //Align the tilt motor to have the flame sensor look directly at the flame
