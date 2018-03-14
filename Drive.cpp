@@ -10,6 +10,9 @@ Drive::Drive(int iRDrive, int iLDrive){
   iLeftDrivePin = iLDrive;
 }
 
+/**
+ * Turn the motors off
+ */
 void Drive::StopMotors(){
   sRightDrive.write(90);
   sLeftDrive.write(90);
@@ -85,17 +88,15 @@ void Drive::TurnTo(double iSetAngle, double iCurAngle){
 }
 
 /**
- * Function to call when attempting to drive straight at a fixed angle
+ * Function to call when attempting to drive straight at a fixed angle a fixed distance from the right wall
  * @param iSetAngle The angle desired
  * @param iCurAngle The current angle of the robot
  * @param iSetDist The distance from the wall that is desired
  * @param iCurDist The distance from the wall that the robot is currently
+ * @param iSetRightDist The distance from the right wall desired
+ * @param iCurRightDist The distance from the right wall currently
  */
 void Drive::DriveToAngleDistanceFromRWall(double iSetAngle, double iCurAngle, double iSetDist, double iCurDist, double iSetRightDist, double iCurRightDist){
-
-  //if(iCurRightDist < iSetRightDist) iSetAngle += 5 * (iSetRightDist - iCurRightDist);
-  //else if(iCurRightDist > iSetRightDist) iSetAngle -= 5 * (iCurRightDist - iSetRightDist);
-  
   int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
   int iMotorSpeed = PIDDistance(iSetDist, iCurDist);
   int iMotorWallOffset = PIDRightWall(iSetRightDist, iCurRightDist);
@@ -114,7 +115,14 @@ void Drive::DriveToAngleDistanceFromRWall(double iSetAngle, double iCurAngle, do
 }
 
 /**
- * Dead Reckon drive to angle
+ * Function to call when attempting to drive straight at a fixed angle and fixed speed fixed distance from right wall
+ * @param dir The direction to spin the motors
+ * @param iSetAngle The angle desired
+ * @param iCurAngle The current angle of the robot
+ * @param iSetDist The distance from the wall that is desired
+ * @param iCurDist The distance from the wall that the robot is currently
+ * @param iSetRightDist The distance from the right wall desired
+ * @param iCurRightDist The distance from the right wall currently
  */
 void Drive::DriveToAngleDeadReckoning(int dir, double iSetAngle, double iCurAngle, double iSetDist, double iCurDist, double iSetRightDist, double iCurRightDist){
   int iMotorOffset = PIDTurn(iSetAngle, iCurAngle);
@@ -135,49 +143,19 @@ void Drive::DriveToAngleDeadReckoning(int dir, double iSetAngle, double iCurAngl
 }
 
 /**
- * Function to call when wanting to PID drive to a wall
- * @param iSetDist The distance desired
- * @param iCurDist The current distance of the robot from the wall
- */
-void Drive::DriveTo(int iSetDist, int iCurDist){
-  int iMotorOut = PIDDistance(iSetDist, iCurDist);
-  sRightDrive.write(90 - iMotorOut);
-  sLeftDrive.write(90 + iMotorOut);
-}
-
-/**
- * Function to Call when wanting to PID follow a Right Wall
- * @param iSetDist The distance desired from the wall
- * @param iCurDist The distance currently from the wall
- * @param iForSpeed The forward moving speed when not adjusting
- */
-void Drive::FollowRightWall(int iSetDist, int iCurDist, int iForSpeed){
-  // calculate the motorOut data
-  int iMotorOut = PIDRightWall(iSetDist, iCurDist);
-
-  // adjust to match motor requirements
-  if(iMotorOut > iForSpeed) iMotorOut = iForSpeed;
-  else if(iMotorOut < iForSpeed*(-1)) iMotorOut = iForSpeed*(-1);
-
-  // drive the motors
-  sRightDrive.write(90 - iForSpeed + iMotorOut);
-  sLeftDrive.write(90 + iForSpeed + iMotorOut);
-}
-
-/**
  * PID to determine motorOut adjustment for for following right wall
  * @param iSetDist The distance desired from the wall
  * @param iCurDist The distance actual from the wall
  * @return dMotorOut The value of motor speed adjustment
  */
-int Drive::PIDRightWall(int iSetDist, int iCurDist){
+int Drive::PIDRightWall(double iSetDist, double iCurDist){
   // calculate the error
   double iError = iSetDist - iCurDist;
 
   // calculate the derivative
   double dDer = (iError - iRWallLastError)/10;
 
-  // total up the sum of the error
+  // total up the sum of the error but cap it at 100000
   if(iRWallSumError < 100000) iRWallSumError += (iError * 10);
 
   //save the last error
@@ -211,10 +189,6 @@ int Drive::PIDTurn(double iSetAngle, double iCurAngle){
   // calculate the motor out value
   double motorOut = iTurnKP * iError + iTurnKI * iTurnSumError + iTurnKD + iDer;
 
-  // adjust to the correct values
-  if(motorOut > 50) motorOut = 50;
-  else if(motorOut < -50) motorOut = -50;
-
   // return the current motorOut Data
   return (int)(motorOut);
 }
@@ -225,7 +199,7 @@ int Drive::PIDTurn(double iSetAngle, double iCurAngle){
  * @param iCurDist The angle the robot is to drive to from the wall
  * @return The motor speed to drive
  */
-int Drive::PIDDistance(int iSetDist, int iCurDist){
+int Drive::PIDDistance(double iSetDist, double iCurDist){
   // calculate the error
   double iError = iSetDist - iCurDist;
 
@@ -240,10 +214,6 @@ int Drive::PIDDistance(int iSetDist, int iCurDist){
 
   // calculate the motor out value
   double motorOut = iDistKP * iError + iDistKI * iDistSumError + iDistKD + iDer;
-
-  // adjust to the correct values
-  if(motorOut > 50) motorOut = 50;
-  else if(motorOut < -50) motorOut = -50;
 
   // return the current motorOut Data
   return (int)(motorOut);

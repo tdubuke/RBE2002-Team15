@@ -56,11 +56,16 @@ void Turret::ArmFan(){
   delay(3000);
 }
 
-
+/**
+ * Spin the fan at 150... about half speed
+ */
 void Turret::spinFan(){
   sESC.write(150);
 }
 
+/**
+ * Turn the fan off
+ */
 void Turret::stopFan(){
   sESC.write(45);
 }

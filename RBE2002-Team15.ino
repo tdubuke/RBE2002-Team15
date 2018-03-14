@@ -20,6 +20,7 @@ LiquidCrystal LCD(40,41,42,43,44,45);                       // LCD display initi
 const int iRightLine = 1;                   // saving the analog port of the right line sensor 
 const int iLeftLine = 2;                    // saving the analog port of the left line sensor
 
+// struct to hold the sensor data
 struct SensorData{
   int iLightSensorX;
   int iLightSensorY;
@@ -29,12 +30,14 @@ struct SensorData{
   bool bIsCliff;
 };
 
+// struct to hold the set data
 struct SetData{
   int iSetAngle;
   int iSetFrontDist;
   int iSetRightDist;
 };
 
+// struct to hold the global position data of things including robot and candle
 struct GlobalPos{
   double dAngle;
   double dAngleOld;
@@ -44,10 +47,7 @@ struct GlobalPos{
   bool valid;
 };
 
-double FlameGX;
-double FlameGY;
-double FlameGZ;
-
+// create the structs to hold all the positions
 SensorData s_SensorData;
 GlobalPos s_GlobalPos; //globalposition for current posn of bot
 GlobalPos s_FirstSighting; //position of robot at first flame sighting
@@ -96,12 +96,14 @@ int iThisCurDist = 0;
 // number to subtract off of gyro readings
 double dSubData;
 
+// flags for sightings
 bool secondSightingFlag = false;
 bool firstSightingFlag = false;
 
 // flag if calibrated
 bool isCalibrated = false;
 
+// flag to see if we can stop when we return home
 bool goHome = false;
 
 // state machine enumeration
@@ -132,6 +134,7 @@ void setup() {
   Serial.begin(9600);
   Wire.begin();
 
+  // set initial values for structs
   s_SetData.iSetAngle = 0;
   s_SetData.iSetFrontDist = 3;
   s_SetData.iSetRightDist = 3;
@@ -151,9 +154,8 @@ void setup() {
 
   // initialization of the drive train stuff
   DriveTrain.initDrive();
-  //DriveTrain.initTurnPID(0.7, 0.003, 7);
   DriveTrain.initTurnPID(1.1, 0.003, 2);
-  DriveTrain.initRWallPID(.7, .001, 2);
+  DriveTrain.initRWallPID(2, .0003, 2.5);
   DriveTrain.initDistPID(7, 0.0004, 5);
 
   LCD.begin(16, 2);
@@ -181,8 +183,9 @@ void setup() {
   Accel_Init();
 }
 
+// if we see a flame see what we need to do with this information
 void checkFlame(SensorData *s_SensorData, GlobalPos *s_GlobalPos, GlobalPos *s_FirstSighting, GlobalPos *s_SecondSighting){
-  if(s_SensorData->iLightSensorY < 1023 && s_SensorData->iLightSensorX < 560 && s_SensorData->iLightSensorX > 450 && firstSightingFlag == false){
+  if(s_SensorData->iLightSensorY < 1023 && s_SensorData->iLightSensorX < 532 && s_SensorData->iLightSensorX > 492 && firstSightingFlag == false){
     
     s_FirstSighting->dAngle = s_GlobalPos->dAngle;
     s_FirstSighting->dAngleOld = s_GlobalPos->dAngleOld;
@@ -191,7 +194,7 @@ void checkFlame(SensorData *s_SensorData, GlobalPos *s_GlobalPos, GlobalPos *s_F
     s_FirstSighting->dZPosition = s_GlobalPos->dZPosition;
     firstSightingFlag = true;
     
-  }else if(s_SensorData->iLightSensorY < 1023 && s_SensorData->iLightSensorX < 560 && s_SensorData->iLightSensorX > 450 && secondSightingFlag == true){
+  }else if(s_SensorData->iLightSensorY < 1023 && s_SensorData->iLightSensorX < 542 && s_SensorData->iLightSensorX > 482 && secondSightingFlag == true){
     // cleans angle and makes sure that new angle is perpendicular to first sightings angle
     if(abs(approxAngle(cleanAngle(s_GlobalPos->dAngle)) - approxAngle(cleanAngle(s_FirstSighting->dAngle))) == 90){
       s_SecondSighting->dAngle = s_GlobalPos->dAngle;
@@ -205,6 +208,7 @@ void checkFlame(SensorData *s_SensorData, GlobalPos *s_GlobalPos, GlobalPos *s_F
   }
 }
 
+// helper function to make the angle nice to work with
 int cleanAngle(double input){
   int returnVal = (int)input % 360;
   if(returnVal < 0) returnVal += 360;
@@ -234,10 +238,11 @@ void loop() {
 
   // go through the state machine every 10 ms, not any faster
   if((iCurTime - iLastSwitchTime) > 10){
-    if(goHome && s_GlobalPos.dXPosition < 10 && s_GlobalPos.dYPosition < 10){
+    // if we are within 10 inches of home then stop
+    if(goHome && abs(s_GlobalPos.dXPosition) < 5 && abs(s_GlobalPos.dYPosition) < 5){
       exit(0);
     }
-    
+
     switch(rState){
       case IdleCalibrate:
         // check if calibration has been done, if so then dont do it again
@@ -248,7 +253,8 @@ void loop() {
           // set flag that the robot has been calibrated
           isCalibrated = true;
         }
-        
+
+        // if the button is pushed then go
         if(digitalRead(iInterruptPin) == 0){
           rState = FindWall;
           rLastState = IdleCalibrate;
@@ -256,10 +262,10 @@ void loop() {
       break;
 
       case FindWall:
-        //RobotTurret.doUpDown();
         // sensor fusion of gyro and front range finder and right range finder
         DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, s_SetData.iSetFrontDist, s_SensorData.iFrontRange, 0, 0);
 
+        // calculate the distance traveled and reset the encoders for the next run
         calcDistance(&s_GlobalPos);
         resetEncoderVal(&rEncoder, &lEncoder);
         
@@ -267,6 +273,7 @@ void loop() {
         if(abs(s_SensorData.iFrontRange - s_SetData.iSetFrontDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
+        // if we see a cliff then do the appropriate action
         if(s_SensorData.bIsCliff){
           rState = BackOffCliff;
           rLastState = FindWall;
@@ -275,6 +282,7 @@ void loop() {
           DriveTrain.resetPID();
         }
 
+        // if we see a wall within 7 inches then lock onto that
         if(s_SensorData.iRightRange < 7){
           rState = RightWallFollow;
           rLastState = FindWall;
@@ -293,17 +301,17 @@ void loop() {
           DriveTrain.resetPID();
         }
 
+        // check if we see a flame
         checkFlame(&s_SensorData, &s_GlobalPos, &s_FirstSighting, &s_SecondSighting);
       break;
 
       case RightWallFollow:
-        //RobotTurret.doUpDown();
         // sensor fusion of gyro and front range finder and right range finder
-        
         DriveTrain.DriveToAngleDistanceFromRWall(s_SetData.iSetAngle, s_GlobalPos.dAngle, 
                                                   s_SetData.iSetFrontDist, s_SensorData.iFrontRange, 
                                                   s_SetData.iSetRightDist, s_SensorData.iRightRange);
 
+        // calculate the distance traveled and reset the encoders
         calcDistance(&s_GlobalPos);
         resetEncoderVal(&rEncoder, &lEncoder);
         
@@ -311,6 +319,7 @@ void loop() {
         if(abs(s_SensorData.iFrontRange - s_SetData.iSetFrontDist) < 2) iSuccessCounter++;
         else iSuccessCounter = 0;
 
+        // if we see a cliff then take the appropriate action
         if(s_SensorData.bIsCliff){
           rState = BackOffCliff;
           rLastState = RightWallFollow;
@@ -323,8 +332,6 @@ void loop() {
           rState = WallCorner0;
           rLastState = RightWallFollow;
           s_SetData.iSetFrontDist = 4;
-        }else{
-          s_SensorData.iLastRightRange = s_SensorData.iRightRange;
         }
         
         // if the number of successes is sufficient, then continue onto next state
@@ -336,6 +343,8 @@ void loop() {
 
           DriveTrain.resetPID();
         }
+
+        // check to see if we see a flame
         checkFlame(&s_SensorData, &s_GlobalPos, &s_FirstSighting, &s_SecondSighting);
       break;
 
@@ -343,33 +352,45 @@ void loop() {
         // turn to angle desired
         DriveTrain.TurnTo(s_SetData.iSetAngle, s_GlobalPos.dAngle);
 
+        // set the secondsighting availability flag
         if(firstSightingFlag == true && secondSightingFlag == false && rLastState != BackOffCliff){
           secondSightingFlag = true;
         }
-        
+
+        // reset the number of successes
         if(abs(s_SetData.iSetAngle - s_GlobalPos.dAngle) < 8) iSuccessCounter++;
         else iSuccessCounter = 0;
 
+        // if we came from right wall following or find wall or wall corner then go to right wall following
         if(iSuccessCounter == iNumValidSuccesses && (rLastState == RightWallFollow || rLastState == FindWall || rLastState == WallCorner2)){
           rState = RightWallFollow;
           rLastState = CornerTurning;
           iSuccessCounter = 0;
+          resetEncoderVal(&rEncoder, &lEncoder);
           DriveTrain.resetPID();
-          s_SensorData.iLastRightRange = 1000;
+
+        // if we came from align head then go to chicken head
         }else if(iSuccessCounter == iNumValidSuccesses && rLastState == AlignHead){
           rState = ChickenHead;
           rLastState = CornerTurning;
           iSuccessCounter = 0;
+          resetEncoderVal(&rEncoder, &lEncoder);
           DriveTrain.resetPID();
+
+        // if we came from back off cliff then go to find wall
         }else if(iSuccessCounter == iNumValidSuccesses && rLastState == BackOffCliff){
           rState = FindWall;
           rLastState = CornerTurning;
           iSuccessCounter = 0;
+          resetEncoderVal(&rEncoder, &lEncoder);
           DriveTrain.resetPID();
+
+        // if we came from flame approach then go to flame approach 2
         }else if(iSuccessCounter == iNumValidSuccesses && rLastState == FlameApproach){
           rState = FlameApproach2;
           rLastState = CornerTurning;
           iSuccessCounter = 0;
+          resetEncoderVal(&rEncoder, &lEncoder);
           DriveTrain.resetPID();
         }
       break;
@@ -378,12 +399,12 @@ void loop() {
         // make sure we still have the flame
         if(RobotTurret.alignTilt(s_SensorData.iLightSensorY) && RobotTurret.alignPan(s_SensorData.iLightSensorX) 
                                   && s_SensorData.iLightSensorX != 1023 && s_SensorData.iLightSensorY != 1023){
-          rState = Triangulate; //CornerTurning;
+          rState = Triangulate;
           rLastState = AlignHead;
-
-          //s_SetData.iSetAngle = s_GlobalPos.dAngle + RobotTurret.getAngle();
+          
+        // if we lose the flame then spray and pray
         }else if(s_SensorData.iLightSensorY == 1023){
-          rState = Triangulate; //CornerTurning;
+          rState = Triangulate;
           rLastState = AlignHead;
         }
         
@@ -394,25 +415,22 @@ void loop() {
       break;
 
       case Triangulate:
+        // calculate the flame move on
         flameCalcCorner(&s_FirstSighting, &s_SecondSighting, RobotTurret.getTiltAngle(), &s_FlamePosition);
-        //RobotTurret.calcTiltAdjust(s_FlamePosition.dZPosition);
-        //if(RobotTurret.tiltToAngle(RobotTurret.getAdjustedAngle())){
-          //if(abs(abs(s_FlamePosition.dXPosition) - abs(s_GlobalPos.dXPosition)) > 36 || abs(abs(s_FlamePosition.dYPosition) - abs(s_GlobalPos.dYPosition)) > 36){
-          //  rState = FlameApproach;
-          //}else{
-            rState = Extinguish;
-          //}
-        //}
+        
+        rState = Extinguish;
         rLastState = ChickenHead;
       break;
 
       case FlameApproach:
+        // if we need to approach the flame then do it
         s_SetData.iSetAngle += RobotTurret.getAngle();
         rState = CornerTurning;
         rLastState = FlameApproach;
       break;
 
       case FlameApproach2:
+        // align the head back to zero to face the flame
         if(RobotTurret.alignToZero() > -1.8 && RobotTurret.alignToZero() < 1.8){
           s_SetData.iSetFrontDist = s_SensorData.iFrontRange - 10;
           rState = FindWall;
@@ -421,22 +439,26 @@ void loop() {
       break;
 
       case Extinguish:
+        // blow for 3 seconds, if we still see the flame, blow again
         if(s_SensorData.iLightSensorX < 1023 && s_SensorData.iLightSensorY < 1023){
           RobotTurret.spinFan();
           delay(3000);
           goHome = true;
+
+        // else we continue on
         }else{
           RobotTurret.stopFan();
-          rState = FlameApproach;
           rState = FindWall;
+          rLastState = Extinguish;
         }
       break;
 
       case WallCorner0:
-        
+        // drive a set distance forward
         iThisCurDist = returnDistance(&rEncoder);
         DriveTrain.DriveToAngleDeadReckoning(1, s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
 
+        // if we see a cliff then take the appropriate actions
         if(s_SensorData.bIsCliff){
           rState = BackOffCliff;
           rLastState = WallCorner0;
@@ -502,6 +524,9 @@ void loop() {
 
           s_SetData.iSetAngle += 90;
 
+          calcDistance(&s_GlobalPos);
+          resetEncoderVal(&rEncoder, &lEncoder);
+
           DriveTrain.resetPID();
         }
          
@@ -544,18 +569,11 @@ void loop() {
       break;
 
       case BackOffCliff:
+        // drive the desired distance
         iThisCurDist = returnDistance(&rEncoder);
         DriveTrain.DriveToAngleDeadReckoning(0, s_SetData.iSetAngle, s_GlobalPos.dAngle, iThisCurDist, s_SetData.iSetFrontDist, 0, 0);
 
-        if(s_SensorData.iFrontRange <= 5){
-          rState = CornerTurning;
-          rLastState = WallCorner2;
-
-          s_SetData.iSetAngle += 90;
-
-          DriveTrain.resetPID();
-        }
-         
+        // if we are far enough back then turn and keep going
         if(iThisCurDist == s_SetData.iSetFrontDist){
           rState = CornerTurning;
           rLastState = BackOffCliff;
@@ -575,31 +593,24 @@ void loop() {
       break;
     }
 
-//    Serial.print("X:");
-//    Serial.print(s_GlobalPos.dXPosition);
-//    Serial.print(" Y: ");
-//    Serial.println(s_GlobalPos.dYPosition);
-//    Serial.print(" IR Y: ");
-//    Serial.print(s_SensorData.iLightSensorY);
-//    Serial.print(" Front Range ");
-//    Serial.print(s_SensorData.iFrontRange);
-//    Serial.print(" Right Range ");
-//    Serial.println(s_SensorData.iRightRange);
-//    Serial.println();
+    // reset the last time through the loop so we maintain the 10 ms loops
     iLastSwitchTime = iCurTime;
   }
 }
 
+/**
+ * Get the steady state error to subtract off gyroscope readings
+ */
 double calibrateGyro(){
   double total = 0;
   delay(1000); //Allow time for the gyro to settle
 
   Serial.println("Calibrating Gyro, Please Hold");
 
+  // get data for gyro values to subtract off
   for(int i = 0; i < iGyroCalCycles; i++){
     gyro.read();
     total += gyro.g.x;
-    //Serial.println(total);
     delay(5);
   }
 
@@ -607,6 +618,9 @@ double calibrateGyro(){
   return total/iGyroCalCycles;
 }
 
+/**
+ * Initialize the accelerometer
+ */
 void Accel_Init(){
   accel.init();
   accel.enableDefault();
@@ -625,6 +639,10 @@ void Accel_Init(){
   }
 }
 
+/**
+ * Calculate the angle of the robot at the current time
+ * @param *s_GlobalPos Global Position to update
+ */
 void calcDegree(GlobalPos *s_GlobalPos){
   gyro.read();
   accel.read();
@@ -647,14 +665,20 @@ void calcDegree(GlobalPos *s_GlobalPos){
 
   float magnitudeofAccel = (abs(accelY)+abs(accelZ));
 
+  // use complimentary filter
   if(magnitudeofAccel < 6 && magnitudeofAccel > 1.2){
     x_Acc = atan2(accelY,accelZ)*180/ PI;
     s_GlobalPos->dAngle = s_GlobalPos->dAngle * 0.98 + x_Acc * 0.02;
   }
 
+  // invert the angle so that rotating left is positive
   s_GlobalPos->dAngle *= -1;
 }
 
+/**
+ * Calculate the right and forward ranges of the range finders
+ * @param *s_SensorData Struct that holds all of the sensor data
+ */
 void calcRange(SensorData *s_SensorData){
   s_SensorData->iFrontRange = (sFrontSonic.getDistance());
 
@@ -668,6 +692,10 @@ void calcRange(SensorData *s_SensorData){
   s_SensorData->iRightRange = (duration/74.0/2.0);
 }
 
+/**
+ * Update the IR cameras values
+ * @param *s_SensorData Struct that holds all of the values of the sensor data
+ */
 void updateLightValues(SensorData *s_SensorData){
   //IR sensor read
   Wire.beginTransmission(slaveAddress);
@@ -694,6 +722,10 @@ void updateLightValues(SensorData *s_SensorData){
   s_SensorData->iLightSensorY = Iy[0];
 }
 
+/**
+ * Function to determine if we are located at a cliff
+ * @param *s_SensorData Struct to hold the data of the sensors from the robot
+ */
 void calcCliff(SensorData *s_SensorData){
   if(analogRead(iRightLine) > 400 || analogRead(iLeftLine) > 400){
     s_SensorData->bIsCliff = true;
@@ -702,6 +734,9 @@ void calcCliff(SensorData *s_SensorData){
   }
 }
 
+/**
+ * Initialize the IR camera with writes to the camera
+ */
 void initLightSensor(){
   slaveAddress = IRsensorAddress >> 1;   // This results in 0x21 as the address to pass to TWI
   // IR sensor initialize
@@ -714,6 +749,11 @@ void initLightSensor(){
   delay(100);
 }
 
+/**
+ * Writes two bytes to the slave address
+ * @param d1 The first byte to send
+ * @param d2 The second byte to send
+ */
 void Write_2bytes(byte d1, byte d2)
 {
   Wire.beginTransmission(slaveAddress);
@@ -721,6 +761,10 @@ void Write_2bytes(byte d1, byte d2)
   Wire.endTransmission();
 }
 
+/**
+ * Calculate the distance traveled based on the encoders
+ * @param *s_GlobalPos The current global position of the robot
+ */
 void calcDistance(GlobalPos *s_GlobalPos){
   double dRTraveled  = returnDistance(&rEncoder);
   double dBotTraveled = dRTraveled;
@@ -730,6 +774,7 @@ void calcDistance(GlobalPos *s_GlobalPos){
   s_GlobalPos->dYPosition += dBotTraveled * sin(dAngleRad);
 }
 
+
 //Calculates the position of the flame by spotting flame, 
 //Taking a corner,
 //then spotting flame again
@@ -737,7 +782,7 @@ void calcDistance(GlobalPos *s_GlobalPos){
 //second position, s_SecondSighting
 //and the Y value from IR Camera at second sighting
 //mutates position of the flame, write out to s_FlamePosition
-GlobalPos* flameCalcCorner(GlobalPos *firstSight, GlobalPos *secondSight, double tiltAngle, GlobalPos *flamePosn){
+void flameCalcCorner(GlobalPos *firstSight, GlobalPos *secondSight, double tiltAngle, GlobalPos *flamePosn){
   Serial.print("Tilt Angle = ");
   Serial.println(tiltAngle);
   Serial.print(firstSight->dXPosition);
@@ -779,7 +824,7 @@ GlobalPos* flameCalcCorner(GlobalPos *firstSight, GlobalPos *secondSight, double
   if((firstAngle == -1) || (secondAngle == -1)){
     //if we get unexpected garbage, send the robot looking again
     rState = FindWall;
-    return 0;
+    return;
   }
   // NORTH -> WEST
   else if(firstAngle == 0 && (secondAngle == 90 || secondAngle == 270)){
@@ -802,7 +847,7 @@ GlobalPos* flameCalcCorner(GlobalPos *firstSight, GlobalPos *secondSight, double
     yFlame = firstY;
   }else{
     rState = FindWall;
-    return 0;
+    return;
   }
 
   //compensate for posn of flame sensor being offset from the center of the IMU axis
@@ -825,8 +870,6 @@ GlobalPos* flameCalcCorner(GlobalPos *firstSight, GlobalPos *secondSight, double
   Serial.println(flamePosn->dZPosition);
 
   flamePosn->valid = true;
-
-  return flamePosn;
 }
 
 //consumes input angle
@@ -899,11 +942,11 @@ void updateLCD(SetData *s_SetData, SensorData *s_SensorData, GlobalPos *s_Global
   if(rState == Extinguish){
     LCD.print("Extinguishing");
   }else if(s_tFlamePosition->valid){
-    LCD.print(s_tFlamePosition->dXPosition);
+    LCD.print((int)s_tFlamePosition->dXPosition);
     LCD.setCursor(5, 1);
-    LCD.print(s_tFlamePosition->dYPosition);
+    LCD.print((int)s_tFlamePosition->dYPosition);
     LCD.setCursor(10, 1);
-    LCD.print(s_tFlamePosition->dZPosition);
+    LCD.print((int)s_tFlamePosition->dZPosition);
   }else if(firstSightingFlag){
     LCD.print("FIRST SIGHTING");
   }else if(isCalibrated && rState == IdleCalibrate){

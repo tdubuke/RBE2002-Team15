@@ -6,4 +6,3 @@
 
 void resetEncoderVal(Encoder *eREncoder, Encoder *eLEncoder);
 double returnDistance(Encoder *eEncoder);
-//void calcDistance(struct GlobalPos *s_GlobalPos, Encoder *rEncoder);

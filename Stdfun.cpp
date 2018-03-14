@@ -23,15 +23,3 @@ double returnDistance(Encoder *eEncoder){
 
   return distance;
 }
-
-/**
- * Calculate the distance traveled and update the global position
- */
-//void calcDistance(struct GlobalPos *s_GlobalPos, Encoder *rEncoder){
-//  double dRTraveled  = returnDistance(rEncoder);
-//  double dBotTraveled = dRTraveled;
-//  double dAngleRad = s_GlobalPos.dAngle * 0.0174533;
-//  
-//  s_GlobalPos.dXPosition += dBotTraveled * cos(dAngleRad);
-//  s_GlobalPos.dYPosition += dBotTraveled * sin(dAngleRad);
-//}

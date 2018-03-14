@@ -19,15 +19,11 @@ public:
 
   void DriveToAngleDistanceFromRWall(double iSetAngle, double iCurAngle, double iSetDist, double iCurDist, double iSetRightDist, double iCurRightDist);
   void DriveToAngleDeadReckoning(int dir, double iSetAngle, double iCurAngle, double iSetDist, double iCurDist, double iSetRightDist, double iCurRightDist);
-  
   void TurnTo(double iSetAngle, double iCurAngle);
+  
   int PIDTurn(double iSetAngle, double iCurAngle);
-
-  void FollowRightWall(int iSetDist, int iCurDist, int iForSpeed);
-  int PIDRightWall(int iSetDist, int iCurDist);
-
-  void DriveTo(int iSetDist, int iCurDist);
-  int PIDDistance(int iSetDist, int iCurDist);
+  int PIDRightWall(double iSetDist, double iCurDist);
+  int PIDDistance(double iSetDist, double iCurDist);
 
   void StopMotors();
 private:
